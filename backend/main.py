@@ -4,27 +4,13 @@ import time
 from fastapi import FastAPI
 from sqlalchemy.exc import OperationalError
 
-from database import engine
+from database import engine, wait_for_database
 from models import Base
 from routers.cities import router as cities_router
 from routers.heatmap import router as heatmap_router
 from routers.live_status import router as live_status_router
 from routers.providers import router as providers_router
 from routers.stations import router as stations_router
-
-
-def wait_for_database(engine, retries: int = 10, delay: float = 2.0) -> None:
-    """Block until the database accepts connections or retries are exhausted."""
-
-    for attempt in range(1, retries + 1):
-        try:
-            with engine.connect():
-                return
-        except OperationalError:
-            if attempt == retries:
-                raise
-            time.sleep(delay)
-
 
 app = FastAPI()
 wait_for_database(engine)
