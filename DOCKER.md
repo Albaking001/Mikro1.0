@@ -23,3 +23,4 @@ Danach:
 ## Nützliche Befehle
 - Container stoppen: `docker compose down`
 - Container + Volume entfernen: `docker compose down -v`
+- Falls bereits Container mit alten, fest vergebenen Namen existieren (z. B. `bikesharing_db`), diese vor dem Start entfernen: `docker rm -f bikesharing_db bikesharing_backend bikesharing_frontend`

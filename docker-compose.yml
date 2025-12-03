@@ -3,7 +3,6 @@ version: "3.9"
 services:
   db:
     image: postgres:15
-    container_name: bikesharing_db
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -17,7 +16,6 @@ services:
   backend:
     build:
       context: ./backend
-    container_name: bikesharing_backend
     depends_on:
       - db
     environment:
@@ -34,7 +32,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: bikesharing_frontend
     depends_on:
       - backend
     ports:
