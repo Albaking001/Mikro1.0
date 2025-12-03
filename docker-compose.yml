@@ -20,7 +20,9 @@ services:
       retries: 5
 
   backend:
-    build: .
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: bikesharing_backend
     restart: always
     depends_on:
@@ -34,6 +36,19 @@ services:
       DB_PORT: 5432
     ports:
       - "8000:8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+    container_name: mikromobilitaet_frontend
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      VITE_DEV_SERVER_HOST: 0.0.0.0
+    ports:
+      - "5173:5173"
 
 volumes:
   db_data:
