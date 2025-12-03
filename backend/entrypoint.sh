@@ -1,6 +1,14 @@
 #!/bin/sh
 set -e
 
+echo "==> Warte auf Datenbank"
+python - <<'PY'
+from database import engine, wait_for_database
+
+wait_for_database(engine)
+print("[DB WAIT] Database is reachable, continuing with startup")
+PY
+
 echo "==> Initialer Import: Cities & Stations"
 python import_scripts/import_nextbike.py || echo "[WARN] Import Nextbike failed, continuing without seed data"
 python import_scripts/import_stations.py || echo "[WARN] Import stations failed, continuing without seed data"
