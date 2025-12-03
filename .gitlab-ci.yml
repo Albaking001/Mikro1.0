@@ -4,13 +4,17 @@ stages:
   - lint
   - build
 
+default:
+  before_script:
+    - cd frontend
+
 # Cache für node_modules, damit die Pipeline schneller ist
 cache:
   key:
     files:
-      - package-lock.json
+      - frontend/package-lock.json
   paths:
-    - node_modules/
+    - frontend/node_modules/
 
 lint:
   stage: lint
@@ -28,7 +32,7 @@ build:
     - npm run build
   artifacts:
     paths:
-      - dist
+      - frontend/dist
   only:
     - merge_requests
     - main
