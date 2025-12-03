@@ -1,8 +1,3 @@
-## Projektstruktur
-
-- **frontend/**: Enthält das bisherige React/Vite-Frontend mitsamt Build- und Lint-Konfiguration.
-- **backend/**: Platzhalterverzeichnis für Backend-relevante Dateien wie Docker- oder PostgreSQL-Konfigurationen.
-
 <<<<<<< HEAD
 # Mikromobilität
 

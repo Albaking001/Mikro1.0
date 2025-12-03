@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: bikesharing_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: imane123
+      POSTGRES_DB: bikesharing
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    container_name: bikesharing_backend
+    restart: always
+    depends_on:
+      - db
+    environment:
+      DB_USER: postgres
+      DB_PASSWORD: imane123
+      DB_NAME: bikesharing
+      DB_HOST: db
+      DB_PORT: 5432
+    ports:
+      - "8000:8000"
+
+volumes:
+  db_data:
