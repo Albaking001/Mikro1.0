@@ -13,19 +13,13 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   backend:
     build: .
     container_name: bikesharing_backend
     restart: always
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     environment:
       DB_USER: postgres
       DB_PASSWORD: imane123

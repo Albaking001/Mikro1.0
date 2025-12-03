@@ -1,108 +1,169 @@
+<<<<<<< HEAD
 # Mikromobilität
 
-Dieses Projekt besteht aus einem React/Vite-Frontend und einem FastAPI-Backend mit PostgreSQL-Datenbank. Die bereitgestellte Docker-Umgebung startet alle Komponenten gemeinsam, sodass keine lokale Toolchain mehr nötig ist.
 
-## Voraussetzungen
-- Docker 20+ und Docker Compose Plugin
 
-### Docker Installations-Tutorial (Windows, macOS, Linux)
-Folge den Schritten für dein Betriebssystem. Am Ende findest du die Prüf-Befehle.
+## Getting started
 
-#### Windows (mit WSL2)
-1. **WSL2 aktivieren** (falls noch nicht geschehen):
-   ```powershell
-   wsl --install
-   ```
-   Danach den Rechner neu starten.
-2. **Docker Desktop installieren**: Lade die Windows-Installer-Datei von https://www.docker.com/products/docker-desktop herunter und führe sie aus.
-3. **Einstellungen prüfen**:
-   - Stelle sicher, dass unter „Settings → General“ die Option "Use WSL 2 based engine" aktiviert ist.
-   - Falls du einen bestimmten WSL-Distro nutzen willst, aktiviere ihn unter „Settings → Resources → WSL Integration“.
-4. **Starten**: Docker Desktop öffnen und warten, bis unten links „Docker Desktop is running“ erscheint.
+To make it easy for you to get started with GitLab, here's a list of recommended next steps.
 
-#### macOS (Intel oder Apple Silicon)
-1. **Download**: Lade die passende DMG für deine Architektur von https://www.docker.com/products/docker-desktop herunter.
-2. **Installation**: DMG öffnen, „Docker.app“ in den Programme-Ordner ziehen und starten. Beim ersten Start werden Kernel-Erweiterungen oder Virtualisierungsrechte abgefragt (erlauben).
-3. **Autostart optional**: In den Einstellungen („Preferences“) kann „Start Docker Desktop when you log in“ aktiviert werden, damit Docker automatisch bereitsteht.
+Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
 
-#### Linux (Debian/Ubuntu)
-1. **Alte Pakete entfernen (falls vorhanden)**:
-   ```bash
-   sudo apt-get remove -y docker docker-engine docker.io containerd runc
-   ```
-2. **Repository vorbereiten und Schlüssel installieren**:
-   ```bash
-   sudo apt-get update
-   sudo apt-get install -y ca-certificates curl gnupg
-   sudo install -m 0755 -d /etc/apt/keyrings
-   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-   echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-   sudo apt-get update
-   ```
-3. **Docker Engine + Compose Plugin installieren**:
-   ```bash
-   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-   ```
-4. **Nutzer in die Docker-Gruppe aufnehmen (optional, erspart sudo)**:
-   ```bash
-   sudo usermod -aG docker "$USER"
-   # danach ab- und wieder anmelden oder: newgrp docker
-   ```
-5. **Dienst starten und aktivieren**:
-   ```bash
-   sudo systemctl enable --now docker
-   ```
+## Add your files
 
-#### Installation prüfen
-```bash
-docker --version          # sollte die Client/Engine-Version anzeigen
-docker compose version    # sollte das Compose Plugin anzeigen
-docker run hello-world    # lädt das Test-Image und bestätigt die Engine-Funktion
+- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
+- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+
 ```
-Falls ein Befehl fehlt, erneut PATH- bzw. Gruppenrechte prüfen (unter Linux ggf. neu anmelden).
-
-## Projektstruktur
-- `frontend` (Root): React + Vite Code
-- `backend/`: FastAPI-API und Datenbankanbindung
-- `docker-compose.yml`: Startet Frontend, Backend und PostgreSQL gemeinsam
-
-## Von Installation bis zum laufenden Stack (Schnellstart)
-1. **Docker installieren** – befolge das Tutorial oben für dein Betriebssystem.
-2. **Quellcode holen**:
-   ```bash
-   git clone <dieses-repo>
-   cd Mikro1.0
-   ```
-3. **Images bauen & Services starten** (erstellt automatisch die Docker-Images und startet alle Container):
-   ```bash
-   docker compose up --build
-   ```
-   - Möchtest du im Hintergrund starten, nutze `docker compose up -d`.
-4. **Verfügbarkeit prüfen**:
-   - `docker ps` sollte die Container `bikesharing_db`, `bikesharing_backend` und `mikromobilitaet_frontend` anzeigen.
-   - Logs ansehen: `docker compose logs -f` (Strg+C beendet die Logausgabe, nicht die Container).
-5. **Endpunkte aufrufen**:
-   - Frontend: http://localhost:5173
-   - Backend (FastAPI): http://localhost:8000
-   - PostgreSQL: Port 5432 (lokal gebunden)
-6. **Aufräumen**:
-   - Container stoppen und Netzwerk entfernen: `docker compose down`
-   - Optional auch das persistente Volume löschen (entfernt Datenbankinhalte): `docker compose down -v`
-
-Docker kümmert sich um die Reihenfolge: Der Backend-Container wartet, bis die Datenbank gesund ist. Daten werden persistent im benannten Volume `db_data` abgelegt.
-
-## Nur Backend mit Datenbank starten
-Falls du ausschließlich das Backend und die Datenbank nutzen möchtest, kannst du im Ordner `backend/` den vorhandenen Compose-Stack starten:
-```bash
-cd backend
-docker compose up --build
+cd existing_repo
+git remote add origin https://gitlab.cs.hs-rm.de/mgued001/mikromobilitaet.git
+git branch -M main
+git push -uf origin main
 ```
 
-## Nützliche Befehle
-- Docker-Logausgabe verfolgen: `docker compose logs -f`
-- Container im Hintergrund starten: `docker compose up -d`
-- Alle Services stoppen: `docker compose down`
+## Integrate with your tools
 
-## Entwicklung ohne Docker
-- Frontend: `npm install` und `npm run dev`
-- Backend: Python 3.11, `pip install -r backend/requirements.txt`, Start via `uvicorn backend.main:app --reload`
+- [ ] [Set up project integrations](https://gitlab.cs.hs-rm.de/mgued001/mikromobilitaet/-/settings/integrations)
+
+## Collaborate with your team
+
+- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
+- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
+- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
+- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
+- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+
+## Test and Deploy
+
+Use the built-in continuous integration in GitLab.
+
+- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
+- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
+- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
+- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
+- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+
+***
+
+# Editing this README
+
+When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+
+## Suggestions for a good README
+
+Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+
+## Name
+Choose a self-explaining name for your project.
+
+## Description
+Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+
+## Badges
+On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+
+## Visuals
+Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+
+## Installation
+Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+
+## Usage
+Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+
+## Support
+Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+
+## Roadmap
+If you have ideas for releases in the future, it is a good idea to list them in the README.
+
+## Contributing
+State if you are open to contributions and what your requirements are for accepting them.
+
+For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+
+You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+
+## Authors and acknowledgment
+Show your appreciation to those who have contributed to the project.
+
+## License
+For open source projects, say how it is licensed.
+
+## Project status
+If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+=======
+# React + TypeScript + Vite
+
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+
+Currently, two official plugins are available:
+
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+## React Compiler
+
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
+
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+>>>>>>> 0e9476e (Initial commit: React + Vite + Tailwind setup)

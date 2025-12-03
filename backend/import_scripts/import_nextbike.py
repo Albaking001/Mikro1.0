@@ -17,10 +17,16 @@ cur = conn.cursor()
 # Provider-ID holen
 cur.execute("SELECT id FROM providers WHERE name = 'Nextbike'")
 row = cur.fetchone()
-if not row:
-    raise Exception("Provider 'Nextbike' nicht in Tabelle providers gefunden!")
-provider_id = row[0]
 
+# Provider automatisch anlegen, falls er fehlt
+if not row:
+    cur.execute(
+        "INSERT INTO providers (name, domain) VALUES (%s, %s) RETURNING id;",
+        ("Nextbike", "nextbike"),
+    )
+    provider_id = cur.fetchone()[0]
+else:
+    provider_id = row[0]
 print("Hole Daten von Nextbike API…")
 res = requests.get(API_URL)
 res.raise_for_status()

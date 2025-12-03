@@ -1,9 +1,31 @@
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+// src/components/MapComponent.tsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  MapContainer,
+  TileLayer,
+  CircleMarker,
+  Popup,
+  ScaleControl,
+} from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import L, { type LatLngExpression } from "leaflet";
-import { useState } from "react";
+import L, { latLngBounds } from "leaflet";
 
-const position: LatLngExpression = [49.992863, 8.247263]; // Mainz
+import { stationStatusLabels, type StationStatus } from "../data/stations";
+
+export type MapStation = {
+  id: number;
+  name: string;
+  coordinates: [number, number];
+  district: string;
+  capacity: number;
+  bikesAvailable: number;
+  lastUpdated: string;
+  status: StationStatus;
+};
+
+type MapComponentProps = {
+  stations: MapStation[];
+};
 
 const defaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -37,68 +59,246 @@ const tileLayers = {
 
 type TileKey = keyof typeof tileLayers;
 
-export default function MapComponent() {
+const statusColors: Record<StationStatus, string> = {
+  in_betrieb: "#22c55e",
+  planung: "#f97316",
+  wartung: "#ef4444",
+};
+
+const initialFilters: Record<StationStatus, boolean> = {
+  in_betrieb: true,
+  planung: true,
+  wartung: false,
+};
+
+const MapComponent: React.FC<MapComponentProps> = ({ stations }) => {
   const [currentStyle, setCurrentStyle] = useState<TileKey>("light");
+  const [activeFilters, setActiveFilters] = useState(initialFilters);
+  const mapRef = useRef<L.Map | null>(null);
+
+  console.log("🗺️ MapComponent received stations:", stations);
+
+  const filteredStations = useMemo(
+    () => stations.filter((station) => activeFilters[station.status]),
+    [stations, activeFilters],
+  );
+
+  const summary = useMemo(() => {
+    const totals = filteredStations.reduce(
+      (acc, station) => {
+        acc.capacity += station.capacity;
+        acc.available += station.bikesAvailable;
+        return acc;
+      },
+      { capacity: 0, available: 0 },
+    );
+
+    return {
+      stationCount: filteredStations.length,
+      capacity: totals.capacity,
+      available: totals.available,
+      utilization: totals.capacity
+        ? Math.round((totals.available / totals.capacity) * 100)
+        : 0,
+    };
+  }, [filteredStations]);
+
+  const latestUpdate = useMemo(() => {
+    if (filteredStations.length === 0) {
+      return null;
+    }
+
+    return filteredStations.reduce(
+      (latest, station) =>
+        station.lastUpdated > latest ? station.lastUpdated : latest,
+      filteredStations[0].lastUpdated,
+    );
+  }, [filteredStations]);
+
+  const handleFilterChange = (status: StationStatus) => {
+    setActiveFilters((current) => ({
+      ...current,
+      [status]: !current[status],
+    }));
+  };
 
   const activeLayer = tileLayers[currentStyle];
+  const defaultCenter = stations[0]?.coordinates ?? [49.992863, 8.247263];
+
+  useEffect(() => {
+    if (!mapRef.current || filteredStations.length === 0) return;
+
+    if (filteredStations.length === 1) {
+      mapRef.current.setView(filteredStations[0].coordinates, 14);
+      return;
+    }
+
+    const bounds = latLngBounds(
+      filteredStations.map((station) => station.coordinates),
+    );
+    mapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+  }, [filteredStations]);
+
+  const handleFitToBounds = () => {
+    if (!mapRef.current || filteredStations.length === 0) return;
+
+    if (filteredStations.length === 1) {
+      mapRef.current.setView(filteredStations[0].coordinates, 14);
+      return;
+    }
+
+    const bounds = latLngBounds(
+      filteredStations.map((station) => station.coordinates),
+    );
+    mapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+  };
 
   return (
-    <div className="w-full">
-      <div className="mb-4 flex items-center gap-3">
-        <label className="text-sm font-medium text-gray-700">
-          Kartenstil:
-        </label>
-        <select
-          value={currentStyle}
-          onChange={(e) => setCurrentStyle(e.target.value as TileKey)}
-          className="border border-gray-300 rounded-md px-3 py-1 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+    <div className="w-full space-y-6">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700">
+            Kartenstil:
+          </label>
+          <select
+            value={currentStyle}
+            onChange={(e) => setCurrentStyle(e.target.value as TileKey)}
+            className="border border-gray-300 rounded-md px-3 py-1 text-sm shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {Object.entries(tileLayers).map(([key, layer]) => (
+              <option key={key} value={key}>
+                {layer.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleFitToBounds}
+          className="text-sm px-3 py-1 rounded-md border border-gray-300 bg-white shadow-sm hover:bg-gray-50"
         >
-          {Object.entries(tileLayers).map(([key, layer]) => (
-            <option key={key} value={key}>
-              {layer.name}
-            </option>
-          ))}
-        </select>
+          Alle Stationen anzeigen
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        {Object.entries(activeFilters).map(([status, enabled]) => (
+          <button
+            key={status}
+            type="button"
+            onClick={() => handleFilterChange(status as StationStatus)}
+            className={`flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition ${
+              enabled
+                ? "border-transparent text-white"
+                : "border-gray-300 text-gray-600 bg-white"
+            }`}
+            style={
+              enabled
+                ? { backgroundColor: statusColors[status as StationStatus] }
+                : undefined
+            }
+          >
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: statusColors[status as StationStatus] }}
+            />
+            {stationStatusLabels[status as StationStatus]}
+          </button>
+        ))}
       </div>
 
       <div className="h-[600px] w-full">
         <MapContainer
-          center={position}
+          center={defaultCenter}
           zoom={13}
-          scrollWheelZoom={true}
+          scrollWheelZoom
           className="leaflet-container rounded-lg overflow-hidden"
+          ref={mapRef}
         >
           <TileLayer
             url={activeLayer.url}
             attribution={activeLayer.attribution}
           />
-          <Marker position={position}>
-            <Popup>Mainz Innenstadt</Popup>
-          </Marker>
+
+          {filteredStations.map((station) => {
+            const utilization = Math.round(
+              (station.bikesAvailable / station.capacity) * 100,
+            );
+
+            return (
+              <CircleMarker
+                key={station.id}
+                center={station.coordinates}
+                radius={12}
+                pathOptions={{
+                  color: statusColors[station.status],
+                  fillColor: statusColors[station.status],
+                  fillOpacity: 0.85,
+                  weight: 2,
+                }}
+              >
+                <Popup>
+                  <div className="space-y-1">
+                    <p className="font-semibold">{station.name}</p>
+                    <p className="text-sm text-gray-700">
+                      Bezirk: {station.district}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      Kapazität: {station.bikesAvailable}/{station.capacity} Bikes
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      Auslastung: {utilization}%
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Status: {stationStatusLabels[station.status]}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Aktualisiert: {station.lastUpdated}
+                    </p>
+                  </div>
+                </Popup>
+              </CircleMarker>
+            );
+          })}
+
+          <ScaleControl position="bottomleft" />
         </MapContainer>
       </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <SummaryCard label="Aktive Stationen" value={summary.stationCount} />
+        <SummaryCard
+          label="Freie Fahrräder"
+          value={`${summary.available} / ${summary.capacity}`}
+          helper="(Bikes verfügbar / Gesamt)"
+        />
+        <SummaryCard
+          label="Aktuelle Auslastung"
+          value={`${summary.utilization}%`}
+          helper={latestUpdate ? `Stand ${latestUpdate}` : undefined}
+        />
+      </div>
+    </div>
+  );
+};
+
+type SummaryCardProps = {
+  label: string;
+  value: string | number;
+  helper?: string;
+};
+
+function SummaryCard({ label, value, helper }: SummaryCardProps) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className="text-2xl font-semibold text-gray-900">{value}</p>
+      {helper ? (
+        <p className="text-xs text-gray-500 mt-1">{helper}</p>
+      ) : null}
     </div>
   );
 }
 
-
-
-/* Falls wird lieber Buttons für Mapwechsel wollen
-
-<div className="mb-4 flex flex-wrap gap-2">
-  {Object.entries(tileLayers).map(([key, layer]) => (
-    <button
-      key={key}
-      onClick={() => setCurrentStyle(key as TileKey)}
-      className={`px-3 py-1 text-sm rounded-md border ${
-        currentStyle === key
-          ? "bg-blue-600 text-white border-blue-700"
-          : "bg-white text-gray-800 border-gray-300"
-      }`}
-    >
-      {layer.name}
-    </button>
-  ))}
-</div>
-
-*/
+export default MapComponent;
