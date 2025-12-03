@@ -10,6 +10,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Guardrail: ensure import scripts are present in the image build context
+RUN test -d /app/import_scripts
+
 # Make entrypoint.sh executable inside the image
 RUN chmod +x /app/entrypoint.sh
 
