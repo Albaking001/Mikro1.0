@@ -1,5 +1,8 @@
 # main.py
+import time
+
 from fastapi import FastAPI
+from sqlalchemy.exc import OperationalError
 
 from database import engine, wait_for_database
 from models import Base
