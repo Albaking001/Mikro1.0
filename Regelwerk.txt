@@ -1,0 +1,26 @@
+Kommunikationsregeln 📣
+
+- Jeder trägt mit Ideen und Vorstellungen zum Projekt bei
+- Pünktlich zu Meetings erscheinen
+- In 5-10 Minuten soll jedes Teammitglied über den Fortschritt der zugewiesenen Tasks berichten, inkl. Problematiken
+- Tasks in Jira aktuell halten für jeden Schritt
+
+Verhaltensregeln 👩🏻‍🤝‍👩🏻
+
+- Respektvoller Umgang: Jeder wird gehört, unabhängig von Rolle u. Erfahrung
+- Hilfe anbieten und auch erbitten, wenn benötigt
+- Kritik sachlich äußern, ohne persönlich zu werden; Gegenseitig ausreden lassen und nicht unterbrechen
+
+Coderegeln 💻
+
+- Kein Merge ohne Peer Review: mind. ein weiteres Mitglied prüft und gibt endgültig frei -> danach in main branche einfügen
+- Clean Code: aussagekräftige Namen (sodass Funktionalität erschließbar) , einheitliche Formatierung, Kommentare nur bei komplexen Funktionen
+- Jede Funktion sollte Unit-Tests haben
+- Branch-Namen nach Muster: feature/<beschreibung> oder bspw bugfix/<beschreibung>
+
+Definition of Done ✅
+
+- Alle Coderegeln erfüllt
+- Dokumentation?
+- im Sprint Review sollen Funktionen erfolgreich demonstriert worden sein
+- Product Owner muss Abnahme bestätigen
