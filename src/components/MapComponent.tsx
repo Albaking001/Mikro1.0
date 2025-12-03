@@ -6,6 +6,7 @@ import {
   CircleMarker,
   Popup,
   ScaleControl,
+  useMap,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L, { latLngBounds } from "leaflet";
@@ -71,6 +72,16 @@ const initialFilters: Record<StationStatus, boolean> = {
   wartung: false,
 };
 
+function MapReadyHandler({ onReady }: { onReady: (map: L.Map) => void }) {
+  const map = useMap();
+
+  useEffect(() => {
+    onReady(map);
+  }, [map, onReady]);
+
+  return null;
+}
+
 const MapComponent: React.FC<MapComponentProps> = ({ stations }) => {
   const [currentStyle, setCurrentStyle] = useState<TileKey>("light");
   const [activeFilters, setActiveFilters] = useState(initialFilters);
@@ -123,7 +134,22 @@ const MapComponent: React.FC<MapComponentProps> = ({ stations }) => {
   };
 
   const activeLayer = tileLayers[currentStyle];
-  const defaultCenter = stations[0]?.coordinates ?? [49.992863, 8.247263];
+  const defaultCenter =
+    filteredStations[0]?.coordinates ?? [49.992863, 8.247263];
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const handleResize = () => mapRef.current?.invalidateSize();
+
+    // Ensure the map tiles render after layout shifts or filter changes
+    mapRef.current.invalidateSize();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [filteredStations.length, currentStyle]);
 
   useEffect(() => {
     if (!mapRef.current || filteredStations.length === 0) return;
@@ -214,8 +240,13 @@ const MapComponent: React.FC<MapComponentProps> = ({ stations }) => {
           zoom={13}
           scrollWheelZoom
           className="leaflet-container rounded-lg overflow-hidden"
-          ref={mapRef}
         >
+          <MapReadyHandler
+            onReady={(mapInstance) => {
+              mapRef.current = mapInstance;
+              mapInstance.invalidateSize();
+            }}
+          />
           <TileLayer
             url={activeLayer.url}
             attribution={activeLayer.attribution}
@@ -264,6 +295,12 @@ const MapComponent: React.FC<MapComponentProps> = ({ stations }) => {
 
           <ScaleControl position="bottomleft" />
         </MapContainer>
+
+        {filteredStations.length === 0 ? (
+          <div className="mt-3 text-center text-sm text-gray-600">
+            Keine Stationsdaten gefunden. Bitte versuche es später erneut.
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
