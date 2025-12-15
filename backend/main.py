@@ -4,7 +4,7 @@ import time
 from fastapi import FastAPI
 from sqlalchemy.exc import OperationalError
 
-from database import SessionLocal, engine, wait_for_database
+from database import SessionLocal, engine, refresh_collation_version, wait_for_database
 from models import Base
 from routers.cities import router as cities_router
 from routers.context import router as context_router
@@ -18,6 +18,8 @@ from services.aggregation import ensure_postgis
 
 app = FastAPI()
 wait_for_database(engine)
+
+refresh_collation_version(engine)
 
 with SessionLocal() as session:
     ensure_postgis(session)
@@ -39,3 +41,10 @@ def root():
         "status": "ok",
         "message": "Mikromobilität API läuft. Siehe /docs für verfügbare Endpunkte.",
     }
+
+
+@app.get("/.well-known/appspecific/{probe:path}", include_in_schema=False)
+def devtools_placeholder(probe: str):
+    """Return a minimal response for Chromium-based DevTools probes (Chrome, Edge)."""
+
+    return {"status": "ok", "probe": probe}
