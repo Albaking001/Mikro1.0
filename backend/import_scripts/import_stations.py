@@ -7,8 +7,8 @@ API_BASE = "https://api.nextbike.net/maps/nextbike-live.json"
 
 conn = psycopg2.connect(
     dbname="bikesharing",
-    user="postgres",          # DB-User
-    password="imane123",      # <-- HNA 7ETTI PASSWORD DIALK
+    user="postgres",          
+    password="imane123",      
     host="db",
     port=5432,
 )
@@ -61,13 +61,13 @@ insert_sql = """
 for city_id, city_uid, city_name in cities:
     print(f"\n==> Lade Stationen für Stadt: {city_name} (uid={city_uid})")
 
-    # API Call: einzelne Stadt
+   
     params = {"city": city_uid}
     res = requests.get(API_BASE, params=params)
     res.raise_for_status()
     data = res.json()
 
-    # Struktur: countries -> cities -> places
+    
     countries = data.get("countries", [])
     if not countries:
         print("  Keine Daten für diese Stadt gefunden.")

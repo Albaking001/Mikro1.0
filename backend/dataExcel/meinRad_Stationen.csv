@@ -1,0 +1,194 @@
+id;label;latitude;longitude
+71521070;"Name: Dyckerhoffstra·e; Station Number: 42500";5003131900;826254500
+71521071;"Name: Erzbergerstra·e; Station Number: 42501";5001199100;822907600
+71723314;"Name: Bahnhof Budenheim; Station Number: 42503";5002701400;817327000
+71723315;"Name: Binger Stra·e; Station Number: 42502";5002489100;817347400
+74471647;"Name: Am Gonsenheimer Wald; Station Number: 42505";5000479500;820110600
+74472031;"Name: Am Gro·berg; Station Number: 42506";4997174600;828550700
+74472032;"Name: Am Rîmerlager; Station Number: 42507";4999382100;826052500
+74472033;"Name: Am Schinnergraben; Station Number: 42508";4996350600;828019900
+74472034;"Name: Am Sportfeld; Station Number: 42509";5000729900;820822500
+74472035;"Name: Am Zollhafen; Station Number: 42510";5001246400;826594600
+74472036;"Name: An der Philippsschanze; Station Number: 42511";4999006300;826373100
+74472037;"Name: Antenne Mainz / Martin-Luther-Str.; Station Number: 42512";4998239900;827963600
+74472038;"Name: Bahnhof Rîmisches Theater; Station Number: 42513";4999354100;827839700
+74472039;"Name: Bahnhof Rîmisches Theater 2; Station Number: 42514";4999469600;827668200
+74472040;"Name: Bahnstra·e; Station Number: 42515";4998184600;824553400
+74472041;"Name: Bastion Martin; Station Number: 42516";4999422200;826590300
+74472042;"Name: Bauhofstra·e; Station Number: 42517";5000331600;826947300
+74472043;"Name: Berliner Stra·e; Station Number: 42518";4998061900;826742600
+74472044;"Name: Berufsschulzentrum; Station Number: 42519";5000562900;824428700
+74472045;"Name: Bischofsplatz; Station Number: 42520";4999816700;827129700
+74472046;"Name: Bismarckplatz; Station Number: 42521";5001272100;824920600
+74472047;"Name: Boppstra·e; Station Number: 42522";5000466400;825993374
+74472048;"Name: BrÅckenplatz; Station Number: 42523";5000321900;827392800
+74472049;"Name: Buergerhaus Kostheim; Station Number: 42524";5000161200;830621700
+74472050;"Name: Canisiusstrasse; Station Number: 42525";5000605700;821618600
+74472051;"Name: Eleonorenstra·e; Station Number: 42526";5001638200;827335700
+74472052;"Name: Emmerich-Josef-Stra·e; Station Number: 42527";4999689900;826524700
+74472053;"Name: Erbacher Hof; Station Number: 42528";4999843600;827587600
+74472054;"Name: Ernst-Ludwig-Platz; Station Number: 42529";5000513800;826879200
+74472055;"Name: Favorite-Parkhotel; Station Number: 42530";4998996000;828966700
+74472056;"Name: Feldbergstra·e; Station Number: 42531";5001055900;826065400
+74472057;"Name: Flachsmarkt; Station Number: 42532";5000252000;827129400
+74472058;"Name: Frauenlobplatz; Station Number: 42533";5000772500;826318300
+74472059;"Name: Gartenfeldplatz; Station Number: 42534";5000581900;825949000
+74472060;"Name: Goetheplatz; Station Number: 42535";5001135500;825482500
+74472061;"Name: Goethestra·e; Station Number: 42536";5000914700;825213700
+74472062;"Name: GonsbachgÑrten; Station Number: 42537";5000879100;823489400
+74472063;"Name: Gro·e Bleiche; Station Number: 42538";5000263100;826706200
+74472064;"Name: Gro·e Langgasse; Station Number: 42539";4999871100;826914000
+74472065;"Name: Hafenstra·e; Station Number: 42540";5001020700;826617400
+74472066;"Name: Hauptbahnhof West; Station Number: 42541";5000039200;825862900
+74472067;"Name: HBF / Bonifaziusstra·e; Station Number: 42542";5000264000;825948000
+74472068;"Name: HBF / Schottstra·e 1; Station Number: 42543";5000196300;826037500
+74472069;"Name: HBF / Schottstra·e 2; Station Number: 42544";5000188500;826043000
+74472070;"Name: Hindenburgplatz; Station Number: 42545";5000620800;826361800
+74472071;"Name: Hochschule Mainz; Station Number: 42546";4998793500;822826600
+74472072;"Name: Hîfchen; Station Number: 42547";4999968708;827168770
+74472073;"Name: Holzstra·e; Station Number: 42548";4999615100;827649700
+74472074;"Name: Jugendherberge; Station Number: 42549";4998641400;829506400
+74472075;"Name: Juxplatz; Station Number: 42550";5000104800;820473000
+74472076;"Name: Kaisertor; Station Number: 42551";5000960400;826890500
+74472077;"Name: Kastel Bahnhof; Station Number: 42552";5000754900;828327300
+74472079;"Name: Kronberger Hof; Station Number: 42554";5000049500;826870300
+74472080;"Name: KurfÅrstliches Schloss; Station Number: 42555";5000746800;827041900
+74472081;"Name: Kurmainz-Kaserne; Station Number: 42556";4997628300;826935800
+74472082;"Name: Laubenheim Bahnhof; Station Number: 42557";4996120100;831363600
+74472083;"Name: Laubenheimer Strasse; Station Number: 42558";4997570000;829641600
+74472084;"Name: Lessingplatz; Station Number: 42559";5000785500;825712200
+74472085;"Name: Lessingstra·e; Station Number: 42560";5000634400;825508000
+74472086;"Name: Ludwig-Nauth-Stra·e; Station Number: 42561";4998052300;823718000
+74472087;"Name: Ludwigsburger Stra·e; Station Number: 42562";5000590500;823933800
+74472088;"Name: Mainzer MobilitÑt; Station Number: 42563";5001465600;825129200
+74472089;"Name: Mainzer Stadtwerke AG; Station Number: 42564";5001067000;826378400
+74472090;"Name: Malakoff-Terrasse; Station Number: 42565";4999573600;828215500
+74472091;"Name: Malakoff-Terrasse 2; Station Number: 42566";4999579000;828168300
+74472092;"Name: meinRad-Werkstatt / Obere Austra·e; Station Number: 42567";5001979000;825069500
+74472093;"Name: Mombacher Tor; Station Number: 42568";5001040700;824387200
+74472094;"Name: MÅhldreieck; Station Number: 42569";4995957200;826807000
+74472095;"Name: MÅnchfeld; Station Number: 42570";4999671267;823012501
+74472096;"Name: Sparkasse Mainz / Hintere Bleiche; Station Number: 42571";5000088600;826271200
+74472097;"Name: Nahestra·e / Zollhafen; Station Number: 42572";5001408800;825854600
+74472098;"Name: Neckarstra·e / Wallaustra·e; Station Number: 42573";5001128000;825973300
+74472099;"Name: Neutorstra·e; Station Number: 42574";4999416700;827917500
+74472100;"Name: Pariser Tor; Station Number: 42575";4998581400;826691700
+74472101;"Name: Poststra·e; Station Number: 42576";4998922200;817858100
+74472102;"Name: Proviantamt; Station Number: 42577";4999950100;826517200
+74472103;"Name: Rathaus; Station Number: 42578";5000051900;827652000
+74472104;"Name: Reduit; Station Number: 42579";5000605000;828239300
+74472105;"Name: Rîmerpassage; Station Number: 42580";5000167900;826806100
+74472106;"Name: Rîmerquelle; Station Number: 42581";4999562100;817493100
+74472107;"Name: Schott AG / Nordbahnhof; Station Number: 42582";5001939700;824673000
+74472108;"Name: Sîmmerringstra·e; Station Number: 42583";5001241500;825601900
+74472109;"Name: Stadthaus; Station Number: 42584";5000223200;826097800
+74472110;"Name: Stadtpark; Station Number: 42585";4999300400;828268100
+74472111;"Name: Synagoge; Station Number: 42586";5000823500;825913300
+74472112;"Name: Taubertsbergbad; Station Number: 42587";5000030700;825586300
+74472113;"Name: Turnvater-Jahn-Stra·e; Station Number: 42588";4998333600;823999300
+74472114;"Name: Uni / Forum; Station Number: 42589";4999441000;824418600
+74472115;"Name: Uni / Haupteingang; Station Number: 42590";4999649400;824682100
+74472116;"Name: Uni / Mensa; Station Number: 42591";4999191900;823482200
+74472117;"Name: Uni / Muschel; Station Number: 42592";4999259500;824116200
+74472118;"Name: UniversitÑtsmedizin SÅd; Station Number: 42593";4999031700;825671700
+74472119;"Name: Uni / Wittichweg; Station Number: 42594";4999434800;823713000
+74472120;"Name: Volkspark; Station Number: 42595";4998575200;828984200
+74472121;"Name: Weinlager / Zollhafen; Station Number: 42596";5001400000;826363400
+74472122;"Name: Weinprobierstand; Station Number: 42597";4999912300;830629700
+74472123;"Name: Wiener Platz; Station Number: 42598";5000593500;829404500
+74472124;"Name: Wilhelm-Raabe-Stra·e; Station Number: 42599";5000348800;821317600
+74472126;"Name: Zitadellenweg / Bahnhof Rîmisches Theater; Station Number: 42601";4999256400;827842900
+74473016;"Name: MÅhlweg; Station Number: 42602";4998525800;825386900
+74473017;"Name: Friedrich-Ebert-Stra·e; Station Number: 42633";4997849000;829384000
+74473018;"Name: Ricarda-Huch-Stra·e; Station Number: 42603";4999730800;823693400
+74473019;"Name: Krongarten; Station Number: 42634";5000963600;821784700
+74473020;"Name: Suderstra·e; Station Number: 42604";5001776900;822966500
+74473021;"Name: Hechtsheimer Stra·e; Station Number: 42635";4998839200;827935300
+74473022;"Name: SÅdwestrundfunk / Am Fort Gonsenheim; Station Number: 42605";5000395200;824798300
+74473023;"Name: Wilhelm-Quetsch-Stra·e / zum Gutenberg Center; Station Number: 42636";4997028000;823613800
+74473024;"Name: Hochheimer Stra·e; Station Number: 42606";5000667600;828921900
+74473025;"Name: Gonsenheimer Stra·e; Station Number: 42637";5002093800;817805800
+74473026;"Name: Rathaus Budenheim; Station Number: 42607";5002156000;816572100
+74473027;"Name: Tanzplatz; Station Number: 42638";4998289700;830290300
+74473028;"Name: Rilkeallee; Station Number: 42608";4995514200;819607000
+74473029;"Name: Hebbelstra·e / BÅrgerhaus Lerchenberg; Station Number: 42639";4995716900;818982200
+74473030;"Name: Am Sonnigen Hang; Station Number: 42609";4996314400;823242700
+74473031;"Name: Hindemithstra·e; Station Number: 42640";4995862200;819849400
+74473032;"Name: Budenheim Golfplatz; Station Number: 42610";5002643500;819454900
+74473033;"Name: BÅrgerhaus Budenheim / Waldschwimmbad; Station Number: 42641";5001837400;815990800
+74473034;"Name: Eaubonner Stra·e; Station Number: 42611";5001870500;817054800
+74473035;"Name: Budenheimer Volksbank; Station Number: 42642";5002292500;817005500
+74473036;"Name: Friedrich-Ebert-Platz; Station Number: 42612";4996705000;834426800
+74473037;"Name: Altrhein / FÑhre; Station Number: 42643";4996332600;834359300
+74473038;"Name: Ballou-Platz; Station Number: 42613";4997484600;833792700
+74473039;"Name: TIGZ; Station Number: 42644";4999295500;831976300
+74473040;"Name: Friedhof Gustavsburg; Station Number: 42614";4999647200;833413900
+74473041;"Name: Fritz-Bauer-Platz; Station Number: 42645";4999706500;832334900
+74473042;"Name: Gustavsburg Bahnhof; Station Number: 42615";4999455500;831414800
+74473043;"Name: In der Nachtweid; Station Number: 42646";4997161100;834544400
+74473044;"Name: Adam-Opel-Stra·e; Station Number: 42616";4998808300;832480600
+74473045;"Name: Bebelstra·e / Stresemannstra·e; Station Number: 42647";4999775000;831775000
+74473046;"Name: Menzelstra·e; Station Number: 42617";4996440400;818753100
+74473047;"Name: SÅdring; Station Number: 42648";4997298700;823867700
+74473048;"Name: Binger Schlag; Station Number: 42618";4999808200;825607700
+74473049;"Name: LBBW / Rheinallee; Station Number: 42649";5001597200;825424700
+74473050;"Name: Turmstra·e / Waggonfabrik; Station Number: 42619";5001418800;823384300
+74473051;"Name: Wilhelm-Theodor-Rîmheld-Str.; Station Number: 42650";4998062000;829015000
+74473052;"Name: Hauptfriedhof; Station Number: 42620";4999586600;825259600
+74473053;"Name: Albert-Stohr-Stra·e; Station Number: 42651";4997814800;824937600
+74473054;"Name: Ortsverwaltung Mombach; Station Number: 42621";5002263400;822468600
+74473055;"Name: Schwimmbad Mombach; Station Number: 42652";5001297900;821816000
+74473056;"Name: Emrichruhstra·e; Station Number: 42622";5001999200;822149200
+74473057;"Name: Mombach Bahnhof; Station Number: 42653";5002159000;822876200
+74473058;"Name: Dr.-Martin-Luther-King-Weg; Station Number: 42623";4999974700;824648400
+74473059;"Name: Kirsteinstra·e; Station Number: 42654";4999062500;825050200
+74473060;"Name: Mombach Westring; Station Number: 42624";5001656800;821777500
+74473061;"Name: Hugo-Eckener-Stra·e / Karlsbader Stra·e; Station Number: 42655";5000603000;822553600
+74473062;"Name: Max-Planck-Stra·e / Viermorgenweg; Station Number: 42625";4999864300;819475500
+74473063;"Name: Marc-Chagall-Stra·e; Station Number: 42656";4997202200;819024100
+74473064;"Name: Curt-Goetz-Stra·e / An den PlatzÑckern; Station Number: 42626";4997494500;819619900
+74473065;"Name: Ortsverwaltung Ebersheim; Station Number: 42657";4991337200;824415100
+74473066;"Name: Backhaushohl; Station Number: 42627";4998894300;824443300
+74473067;"Name: Daniel-Brendel-Stra·e; Station Number: 42658";4997972100;819335600
+74473068;"Name: Tîngeshof; Station Number: 42628";4991583800;825480100
+74473069;"Name: Gutenberg Center - Eingang C; Station Number: 42659";4996807800;822815300
+74473070;"Name: Gutenberg Center - Eingang A; Station Number: 42629";4996694000;823003400
+74473071;"Name: BÅrgerhaus Finthen; Station Number: 42660";4998515100;817829200
+74473073;"Name: BÅrgerhaus Hechtsheim; Station Number: 42630";4995766000;827532600
+74473074;"Name: ZDF / Sendezentrum 2; Station Number: 42661";4996165500;821428100
+74473075;"Name: ZDF / Sendezentrum 1; Station Number: 42631";4996228100;820716100
+74473076;"Name: Impfzentrum / An der Bruchspitze; Station Number: 42662";5000508100;823059300
+74473077;"Name: MÅnsterplatz; Station Number: 42632";4999994500;826375100
+86323060;"Name: Neckarstra·e II; Station Number: 42756";4996427800;835136100
+87678098;"Name: Marienhaus Klinikum Mainz; Station Number: 42663";4998862000;826988000
+87678230;"Name: Zitadelle; Station Number: 42664";4999331300;827335100
+93476664;"Name: Am Lindequartier - wÑhrend MainbrÅckensperrung; Station Number: 42757";5000243200;829686400
+99038375;"Name: Reisinger Weg / UniversitÑtsmedizin; Station Number: 42758";4999388900;825551000
+99038856;"Name: Helmholtzweg / UniversitÑtsmedizin; Station Number: 42759";4999201700;825929500
+99039004;"Name: Sirius GutenbergPark; Station Number: 42761";4995663048;825529418
+99040633;"Name: UniversitÑtsmedizin Haupteingang; Station Number: 42760";4999325600;825936600
+107182231;"Name: MEWA ARENA; Station Number: 42762";4998609000;822517000
+162218613;"Name: Alte Mainzer Str. - NUR fÅr Lastenrad, KEINE klassischen RÑder!; Station Number: 42763";4996144400;828069400
+165353979;"Name: Fischtorplatz; Station Number: 42764";4999989400;827646700
+165354102;"Name: Am Rîmerlager; Station Number: 42765";4999390100;826047600
+165354509;"Name: Auenstra·e / Ingelheimer Aue; Station Number: 42767";5002490200;823847900
+165355001;"Name: Isaac-Fulda-Alle; Station Number: 42770";4999402200;822233100
+165355230;"Name: Jakob-Heinz-Str. / CampusbrÅcke; Station Number: 42771";4998980600;822691700
+209228533;"Name: Ernst-Reuter-Stra·e; Station Number: 42772";4996272600;831888700
+209609180;"Name: An der Goldgrube; Station Number: 42768";4998773800;827197200
+209609612;"Name: Elly-Beinhorn-Stra·e; Station Number: 42769";4997805300;827628700
+223607831;"Name: Haltestelle DarmstÑdter Stra·e; Station Number: 42778";4998379400;835950700
+223608340;"Name: Bischofsheim Bahnhof (Bahnhofsplatz & An der Bahn); Station Number: 42776";4999244900;835795800
+223610983;"Name: Rîmerstra·e / Klinikerteich; Station Number: 42783";4998794300;835009100
+223612523;"Name: Haltestelle Rheinstra·e; Station Number: 42779";4998823000;835561000
+223615658;"Name: Haltestelle Am Mainweg; Station Number: 42780";4999128000;835152000
+223616276;"Name: Haltestelle An den SportstÑtten; Station Number: 42781";4997726000;834720000
+223616641;"Name: Bîcklersiedlung / Ulmenstra·e; Station Number: 42782";4999447000;836118000
+223622524;"Name: BÅrgerhaus Bischofsheim; Station Number: 42784";4998476800;836268500
+223656761;"Name: Green Fit / Green Deli; Station Number: 42785";4997437300;823711000
+224375031;"Name: Bahnhof Kastel - DB Mobility Hub 1; Station Number: 42786";5000710800;828278000
+228323696;"Name: Bahnhof Kastel - DB Mobility Hub 2; Station Number: 42787";5000602207;828357339
+287734136;"Name: Kunsthalle / Zollhafen; Station Number: 42777";5001215200;826167300
+318706527;"Name: HBF / DB Mobility Hub; Station Number: 42788";5000073200;825994900
+444344630;"Name: Am Mombacher Kreisel; Station Number: 42811";5002597350;822092772
+452538987;"Name: Kantstra·e; Station Number: 42814";4999546600;823867800

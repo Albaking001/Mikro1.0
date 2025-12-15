@@ -1,131 +1,80 @@
 // src/pages/HomePage.tsx
-import React, { Suspense, useCallback, useEffect, useState, lazy } from "react";
+import React, { useEffect, useState } from "react";
 import MapComponent, { type MapStation } from "../components/MapComponent";
 
-import type { ApiStation } from "../services/api";
-import type { StationStatus } from "../data/stations";
+type MainzApiStation = {
+  id: number;
+  name: string;
+  lat: number;
+  lng: number;
+  station_number: number;
+};
 
-const PlanningMap = lazy(() => import("../features/planning/PlanningMap"));
-
-const inferStatus = (capacity: number): StationStatus =>
-  capacity > 0 ? "in_betrieb" : "planung";
-
-const mapFromApi = (s: ApiStation): MapStation => ({
+const mapFromMainzApi = (s: MainzApiStation): MapStation => ({
   id: s.id,
   name: s.name,
   coordinates: [s.lat, s.lng],
-  district: "",
-  capacity: s.capacity,
-  bikesAvailable: s.capacity,
-  lastUpdated: "",
-  status: inferStatus(s.capacity),
+  stationNumber: s.station_number,
 });
 
 const HomePage: React.FC = () => {
   const [stations, setStations] = useState<MapStation[]>([]);
-  const [apiStations, setApiStations] = useState<ApiStation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchStations = useCallback(
-    async (signal?: AbortSignal) => {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
       try {
         setError(null);
         setLoading(true);
 
-        const res = await fetch("/api/v1/stations?city_uid=160", { signal });
+        const res = await fetch("/api/v1/stations/mainz");
 
         if (!res.ok) {
           const text = await res.text();
-          console.error("Error /stations?city_uid=160:", res.status, text);
-          throw new Error(`Fehler /stations?city_uid=160: ${res.status}`);
+          console.error("Error /api/v1/stations/mainz:", res.status, text);
+          throw new Error(`Fehler /api/v1/stations/mainz: ${res.status}`);
         }
 
-        const data = (await res.json()) as ApiStation[];
-        console.log(" API /stations?city_uid=160 data:", data);
+        const data = (await res.json()) as MainzApiStation[];
+        if (cancelled) return;
 
-        if (signal?.aborted) return;
-
-        const mapped = data.map(mapFromApi);
-        console.log(" Mapped stations for map:", mapped);
+        const mapped = data
+          .map(mapFromMainzApi)
+          .filter((s) => Number.isFinite(s.coordinates[0]) && Number.isFinite(s.coordinates[1]));
 
         setStations(mapped);
-        setApiStations(data);
       } catch (err: unknown) {
-        if (signal?.aborted) return;
-        console.error(" Error loading stations:", err);
-        setError(
-          err instanceof Error ? err.message : "Unbekannter Fehler beim Laden",
-        );
+        console.error("Error loading stations:", err);
+        setError(err instanceof Error ? err.message : "Unbekannter Fehler beim Laden");
       } finally {
-        if (!signal?.aborted) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
-    },
-    [],
-  );
+    }
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchStations(controller.signal);
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-    return () => controller.abort();
-  }, [fetchStations]);
-
-  const handleReload = () => fetchStations();
+  if (loading) return <p>Stationen werden geladen...</p>;
 
   return (
     <div>
-      {loading ? (
-        <p style={{ fontWeight: "bold" }}>Stationen werden geladen...</p>
-      ) : null}
-
-      {error ? (
-        <div
-          style={{
-            color: "#991b1b",
-            background: "#fee2e2",
-            border: "1px solid #fecdd3",
-            borderRadius: "8px",
-            padding: "12px",
-            marginBottom: "12px",
-          }}
-        >
-          <p style={{ fontWeight: "bold", margin: 0 }}>
-            Fehler beim Laden der Stationen: {error}
-          </p>
-          <button
-            type="button"
-            onClick={handleReload}
-            style={{
-              marginTop: "8px",
-              background: "#991b1b",
-              color: "white",
-              padding: "6px 10px",
-              borderRadius: "6px",
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
-            Erneut laden
-          </button>
-        </div>
-      ) : null}
+      {error && (
+        <p style={{ color: "red", fontWeight: "bold" }}>
+          Fehler beim Laden der Stationen: {error}
+        </p>
+      )}
 
       <p>
         <strong>Geladene Stationen:</strong> {stations.length}
       </p>
 
       <MapComponent stations={stations} />
-
-      <Suspense fallback={<p>Planungskarte wird geladen...</p>}>
-        <PlanningMap />
-      </Suspense>
-
-      <p style={{ marginTop: "1rem", fontSize: "12px", color: "#555" }}>
-        Debug: stations.length = {stations.length}
-      </p>
     </div>
   );
 };

@@ -18,7 +18,7 @@ def get_db():
         db.close()
 
 
-# ▷ 1) Liste aller Städte
+
 @router.get("")
 def list_cities(db: Session = Depends(get_db)):
     cities = db.query(City).all()
@@ -37,7 +37,7 @@ def list_cities(db: Session = Depends(get_db)):
     ]
 
 
-# ▷ 2) Eine Stadt per ID
+
 @router.get("/{city_id}")
 def get_city(city_id: int, db: Session = Depends(get_db)):
     city = db.query(City).filter(City.id == city_id).first()

@@ -7,8 +7,8 @@ API_URL = "https://api.nextbike.net/maps/nextbike-live.json?list_cities=1"
 
 conn = psycopg2.connect(
     dbname="bikesharing",
-    user="postgres",          # dein DB-User
-    password="imane123", # dein Passwort
+    user="postgres",        
+    password="imane123", 
     host="db",
     port=5432,
 )

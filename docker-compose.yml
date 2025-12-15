@@ -2,20 +2,22 @@ version: "3.9"
 
 services:
   db:
-    image: postgis/postgis:15-3.4
-    restart: unless-stopped
+    image: postgres:15
+    container_name: bikesharing_db
+    restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: imane123
       POSTGRES_DB: bikesharing
-    volumes:
-      - db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
 
   backend:
-    build:
-      context: ./backend
+    build: .
+    container_name: bikesharing_backend
+    restart: always
     depends_on:
       - db
     environment:
@@ -26,7 +28,7 @@ services:
       DB_PORT: 5432
     ports:
       - "8000:8000"
-    restart: unless-stopped
+
 
   frontend:
     build:
@@ -35,7 +37,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "80:80"
+      - "5173:80"
     restart: unless-stopped
 
 volumes:

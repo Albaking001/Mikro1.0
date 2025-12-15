@@ -4,5 +4,9 @@ sqlalchemy
 psycopg2-binary
 requests
 python-dotenv
-pytest
-httpx
+pandas
+ftfy
+requests
+
+
+
