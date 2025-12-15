@@ -29,3 +29,13 @@ app.include_router(live_status_router)
 app.include_router(heatmap_router)
 app.include_router(providers_router)
 app.include_router(scoring_router)
+app.include_router(context_router)
+app.include_router(aggregates_router)
+
+
+@app.get("/")
+def root():
+    return {
+        "status": "ok",
+        "message": "Mikromobilität API läuft. Siehe /docs für verfügbare Endpunkte.",
+    }
