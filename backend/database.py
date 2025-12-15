@@ -47,12 +47,15 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def refresh_collation_version(session) -> None:
-    """Refresh the database collation to silence mismatch warnings on startup."""
+def refresh_collation_version(engine) -> None:
+    """Refresh the database collation to silence mismatch warnings on startup.
+
+    ALTER DATABASE cannot run inside a transaction block, so we open an
+    autocommit connection explicitly instead of using the scoped session.
+    """
 
     try:
-        session.execute(text(f"ALTER DATABASE {DB_NAME} REFRESH COLLATION VERSION"))
-        session.commit()
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            conn.execute(text(f"ALTER DATABASE {DB_NAME} REFRESH COLLATION VERSION"))
     except Exception as exc:  # pragma: no cover - defensive startup helper
-        session.rollback()
         print(f"[DB] Could not refresh collation version: {exc}")
