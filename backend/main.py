@@ -39,3 +39,10 @@ def root():
         "status": "ok",
         "message": "Mikromobilität API läuft. Siehe /docs für verfügbare Endpunkte.",
     }
+
+
+@app.get("/.well-known/appspecific/{probe:path}", include_in_schema=False)
+def devtools_placeholder(probe: str):
+    """Return a minimal response for Chromium-based DevTools probes (Chrome, Edge)."""
+
+    return {"status": "ok", "probe": probe}
