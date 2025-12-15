@@ -11,6 +11,7 @@ from routers.context import router as context_router
 from routers.heatmap import router as heatmap_router
 from routers.live_status import router as live_status_router
 from routers.providers import router as providers_router
+from routers.scoring import router as scoring_router
 from routers.stations import router as stations_router
 from routers.aggregates import router as aggregates_router
 from services.aggregation import ensure_postgis
@@ -27,4 +28,4 @@ app.include_router(stations_router)
 app.include_router(live_status_router)
 app.include_router(heatmap_router)
 app.include_router(providers_router)
-app.include_router(aggregates_router)
+app.include_router(scoring_router)
