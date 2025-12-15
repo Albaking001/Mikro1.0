@@ -2,17 +2,19 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     Column,
+    DateTime,
+    Float,
+    ForeignKey,
     Integer,
     String,
-    Float,
-    Boolean,
-    DateTime,
-    ForeignKey,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship
+from geoalchemy2 import Geometry
 
 from database import Base
 
@@ -85,11 +87,8 @@ class Station(Base):
 
     city = relationship("City", back_populates="stations")
     provider = relationship("Provider", back_populates="stations")
-    # ⬇️ هادي لي كانت ناقصة
     live_status = relationship(
-        "StationLiveStatus",
-        back_populates="station",
-        cascade="all, delete-orphan",
+        "StationLiveStatus", back_populates="station", cascade="all, delete-orphan"
     )
 
 
@@ -105,3 +104,47 @@ class StationLiveStatus(Base):
     bike_types = Column(JSON)
 
     station = relationship("Station", back_populates="live_status")
+
+
+# ---------- meinRad ingest ----------
+class MeinradStation(Base):
+    __tablename__ = "meinrad_stations"
+    __table_args__ = (UniqueConstraint("external_id", name="uq_meinrad_external_id"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    external_id = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    lat = Column(Float, nullable=False)
+    lng = Column(Float, nullable=False)
+    capacity = Column(Integer)
+    city = Column(String)
+
+    usage = relationship("MeinradUsage", back_populates="station", cascade="all, delete-orphan")
+
+
+class MeinradUsage(Base):
+    __tablename__ = "meinrad_usage"
+
+    id = Column(Integer, primary_key=True, index=True)
+    station_id = Column(Integer, ForeignKey("meinrad_stations.id"), index=True)
+    ts = Column(DateTime, default=datetime.utcnow, index=True)
+    rides_started = Column(Integer, default=0)
+    rides_ended = Column(Integer, default=0)
+    bikes_available = Column(Integer)
+
+    station = relationship("MeinradStation", back_populates="usage")
+
+
+# ---------- Aggregates ----------
+class StationHexAggregate(Base):
+    __tablename__ = "station_hex_aggregates"
+    __table_args__ = (UniqueConstraint("hex_id", "resolution", name="uq_hex_res"),)
+
+    id = Column(Integer, primary_key=True)
+    hex_id = Column(String, index=True, nullable=False)
+    resolution = Column(Integer, index=True, nullable=False)
+    total_rides_started = Column(Integer, default=0)
+    total_rides_ended = Column(Integer, default=0)
+    avg_bikes_available = Column(Float)
+    geom = Column(Geometry(geometry_type="POLYGON", srid=4326))
+
