@@ -24,7 +24,13 @@ import {
   type NearestStationHit,
   type PlanningStation,
 } from "../../store/planningSlice";
-import { fetchApiStations } from "../../services/api";
+import PlanningSidebar from "./PlanningSidebar";
+import {
+  fetchContextLayers,
+  fetchContextSummary,
+  type ContextLayers,
+  type ContextSummary,
+} from "../../services/api";
 
 const defaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -88,7 +94,13 @@ const PlanningMap: React.FC = () => {
     () => createPlanningActions(() => stations, setStations),
     [stations],
   );
+  const [layers, setLayers] = useState<ContextLayers | null>(null);
+  const [summary, setSummary] = useState<ContextSummary | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [loadingLayers, setLoadingLayers] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const pendingLookup = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
 
   const handleReverseGeocode = (stationId: string, lat: number, lng: number) => {
     if (pendingLookup.current) {
@@ -114,73 +126,54 @@ const PlanningMap: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const loadExisting = async () => {
+    async function loadLayers() {
       try {
-        setLoadingExisting(true);
-        setLoadError(null);
-        const stationsFromApi = await fetchApiStations();
-        if (cancelled) return;
-        const mapped = mapExistingStations(stationsFromApi);
-        setExistingStations(mapped);
-      } catch (error) {
-        if (cancelled) return;
-        setLoadError(error instanceof Error ? error.message : "Unbekannter Fehler");
+        setLoadingLayers(true);
+        const response = await fetchContextLayers();
+        setLayers(response);
+      } catch (layerError) {
+        console.error("Failed to load context layers", layerError);
+        setError("Layer konnten nicht geladen werden");
       } finally {
-        if (!cancelled) {
-          setLoadingExisting(false);
-        }
+        setLoadingLayers(false);
       }
-    };
-
-    loadExisting();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (existingStations.length === 0) {
-      setNearestLookup(new Map());
-      setCoverageCells([]);
-      return;
     }
 
-    const searcher = createNearestNeighborSearcher(existingStations);
-    const nextLookup = new Map<string, NearestStationHit[]>();
+    void loadLayers();
+  }, []);
 
-    stations.forEach((station) => {
-      nextLookup.set(station.id, searcher({ lat: station.lat, lng: station.lng }, 3));
-    });
-
-    setNearestLookup(nextLookup);
-
-    const grid = buildHexGrid(existingStations, DEFAULT_COVERAGE_RADIUS_METERS * 1.25);
-    const cells = markCoverageGaps(grid, existingStations).filter((cell) => !cell.covered);
-    setCoverageCells(cells);
-  }, [existingStations, stations]);
+  const loadSummary = async (lat: number, lng: number) => {
+    try {
+      setLoadingSummary(true);
+      setError(null);
+      const res = await fetchContextSummary(lat, lng, 700);
+      setSummary(res);
+    } catch (summaryError) {
+      console.error("Failed to fetch context summary", summaryError);
+      setError("Kontext konnte nicht geladen werden");
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
 
   const createStation = (lat: number, lng: number) => {
     const fallbackLabel = `Geplanter Standort (${formatCoordinate(lat)}, ${formatCoordinate(lng)})`;
     const stationId = actions.addStation({ lat, lng, label: fallbackLabel });
+    setSelectedStationId(stationId);
     handleReverseGeocode(stationId, lat, lng);
+    void loadSummary(lat, lng);
   };
 
-  const markers = stations.map((station) => {
-    const nearest = nearestLookup.get(station.id) ?? [];
+  const selectedStation = stations.find((station) => station.id === selectedStationId);
 
-    return (
-      <Marker key={station.id} position={[station.lat, station.lng]}>
-        <Popup>
-          <strong>{station.label ?? "Neuer Standort"}</strong>
-          <div style={{ marginTop: "0.5rem", fontSize: "12px", color: "#4b5563" }}>
-            <div>
-              Koordinaten: {formatCoordinate(station.lat)}, {" "}
-              {formatCoordinate(station.lng)}
-            </div>
-            <div>Erstellt: {new Date(station.createdAt).toLocaleString()}</div>
+  const markers = stations.map((station) => (
+    <Marker key={station.id} position={[station.lat, station.lng]}>
+      <Popup>
+        <strong>{station.label ?? "Neuer Standort"}</strong>
+        <div style={{ marginTop: "0.5rem", fontSize: "12px", color: "#4b5563" }}>
+          <div>
+            Koordinaten: {formatCoordinate(station.lat)}, {" "}
+            {formatCoordinate(station.lng)}
           </div>
           {nearest.length > 0 && (
             <div style={{ marginTop: "0.75rem" }}>
@@ -249,7 +242,11 @@ const PlanningMap: React.FC = () => {
           {stations.length > 0 && (
             <button
               type="button"
-              onClick={() => actions.clearStations()}
+              onClick={() => {
+                actions.clearStations();
+                setSummary(null);
+                setSelectedStationId(null);
+              }}
               style={{
                 border: "1px solid #d1d5db",
                 background: "#f9fafb",
@@ -269,21 +266,36 @@ const PlanningMap: React.FC = () => {
         )}
       </header>
 
-      <div style={{ height: "420px", borderRadius: "12px", overflow: "hidden", border: "1px solid #e5e7eb" }}>
-        <MapContainer
-          center={[49.992863, 8.247263]}
-          zoom={12}
-          style={{ height: "100%", width: "100%" }}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <MapClickHandler onCreateStation={createStation} />
-          {coverageOverlays}
-          {uncoveredPolygons}
-          {markers}
-        </MapContainer>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr",
+          gap: "1rem",
+          alignItems: "start",
+        }}
+      >
+        <div style={{ height: "440px", borderRadius: "12px", overflow: "hidden", border: "1px solid #e5e7eb" }}>
+          <MapContainer
+            center={[49.992863, 8.247263]}
+            zoom={12}
+            style={{ height: "100%", width: "100%" }}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <MapClickHandler onCreateStation={createStation} />
+            {markers}
+          </MapContainer>
+        </div>
+
+        <PlanningSidebar
+          selectedLabel={selectedStation?.label}
+          summary={summary}
+          layers={layers}
+          loading={loadingSummary || loadingLayers}
+          error={error}
+        />
       </div>
     </section>
   );
