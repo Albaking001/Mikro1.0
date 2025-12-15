@@ -4,3 +4,6 @@ sqlalchemy
 psycopg2-binary
 requests
 python-dotenv
+pandas
+h3
+geoalchemy2
