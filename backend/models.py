@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -101,6 +102,6 @@ class StationLiveStatus(Base):
     ts = Column(DateTime, default=datetime.utcnow)
     bikes_available = Column(Integer)
     docks_available = Column(Integer)
-    bike_types = Column(JSONB)
+    bike_types = Column(JSON)
 
     station = relationship("Station", back_populates="live_status")

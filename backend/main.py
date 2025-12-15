@@ -10,6 +10,7 @@ from routers.cities import router as cities_router
 from routers.heatmap import router as heatmap_router
 from routers.live_status import router as live_status_router
 from routers.providers import router as providers_router
+from routers.scoring import router as scoring_router
 from routers.stations import router as stations_router
 
 app = FastAPI()
@@ -20,3 +21,4 @@ app.include_router(stations_router)
 app.include_router(live_status_router)
 app.include_router(heatmap_router)
 app.include_router(providers_router)
+app.include_router(scoring_router)
