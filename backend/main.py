@@ -4,7 +4,7 @@ import time
 from fastapi import FastAPI
 from sqlalchemy.exc import OperationalError
 
-from database import SessionLocal, engine, wait_for_database
+from database import SessionLocal, engine, refresh_collation_version, wait_for_database
 from models import Base
 from routers.cities import router as cities_router
 from routers.context import router as context_router
@@ -20,6 +20,7 @@ app = FastAPI()
 wait_for_database(engine)
 
 with SessionLocal() as session:
+    refresh_collation_version(session)
     ensure_postgis(session)
 
 Base.metadata.create_all(bind=engine)
