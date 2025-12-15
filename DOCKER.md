@@ -6,9 +6,9 @@ Dieses Projekt enthält ein gemeinsames Docker-Setup für das Frontend (Vite/Rea
 - Docker und Docker Compose
 
 ## Dienste
-- **db**: PostgreSQL 15 mit persistentem Volume `db_data`.
+- **db**: PostgreSQL 15 mit PostGIS (Image `postgis/postgis:15-3.4`) und persistentem Volume `db_data`.
 - **backend**: FastAPI-Anwendung aus `./backend` auf Port `8000`.
-- **frontend**: Ausgelieferte Vite-Builds via Nginx auf Port `5173` (leitet `/api/` an das Backend weiter).
+- **frontend**: Ausgelieferte Vite-Builds via Nginx auf Port `80` (leitet `/api/` an das Backend weiter).
 
 ## Starten
 ```bash
@@ -16,7 +16,7 @@ docker compose up --build
 ```
 
 Danach:
-- Frontend: http://localhost:5173
+- Frontend: http://localhost:80
 - Backend: http://localhost:8000 (API unter `/api/v1`)
 - Postgres: localhost:5432 (User `postgres`, Passwort `imane123`, DB `bikesharing`)
 
