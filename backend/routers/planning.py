@@ -146,6 +146,38 @@ def _evaluate_score(context: dict, nearby: dict) -> tuple[float, dict]:
     return round(total_score, 1), components
 
 
+def _build_decision(score: float, components: dict) -> dict:
+    """Translate the numeric score into a build/no-build recommendation."""
+    decision: str
+    rationale: str
+
+    if score >= 80:
+        decision = "bauen empfohlen"
+        rationale = "hohe Nachfrage durch starken ÖPNV-Knoten, Bildung und POIs"
+    elif score >= 60:
+        decision = "bauen sinnvoll"
+        rationale = "gute Grundnachfrage, ergänzt durch vorhandene Stationen im Umfeld"
+    elif score >= 40:
+        decision = "testen / pilotieren"
+        rationale = "durchschnittliches Umfeld – zuerst klein starten"
+    else:
+        decision = "nicht priorisieren"
+        rationale = "wenig ÖPNV/POIs oder kaum Nachfrageindikatoren"
+
+    demand_drivers = {
+        "transport_strength": components.get("transport", 0) + components.get("station_density", 0),
+        "education_presence": components.get("education", 0),
+        "amenities": components.get("shops", 0) + components.get("pois", 0),
+    }
+
+    return {
+        "build_score": score,
+        "decision": decision,
+        "rationale": rationale,
+        "demand_drivers": demand_drivers,
+    }
+
+
 @router.get("/context")
 def planning_context(
     lat: float = Query(...),
@@ -226,6 +258,7 @@ def evaluate_location(
     context = _fetch_context_data(lat, lng, radius)
     nearby = nearby_stations(lat=lat, lng=lng, radius=radius, city_name=city_name, db=db)
     score, components = _evaluate_score(context, nearby)
+    build_decision = _build_decision(score, components)
 
     return {
         "lat": lat,
@@ -235,6 +268,7 @@ def evaluate_location(
         "score": score,
         "label": _score_label(score),
         "recommended_station_size": _station_size_recommendation(score),
+        "build_recommendation": build_decision,
         "components": components,
         "context": context,
         "stations": nearby,
