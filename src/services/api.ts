@@ -8,83 +8,96 @@ export type ApiStation = {
   capacity: number;
 };
 
-export type ContextHex = {
-  hexId: string;
-  centroid: { lat: number; lng: number };
-  population: number;
-  density: number;
-  transitStops: number;
-  poiCount: number;
-  poiCategories: Record<string, number>;
+export type UtilizationSnapshot = {
+  ts: string;
+  bikes_available: number;
+  docks_available: number;
+  utilization: number | null;
 };
 
-export type ContextLayers = {
-  population: ContextHex[];
-  density: ContextHex[];
-  transit: ContextHex[];
-  pois: ContextHex[];
-};
-
-export type ContextSummary = {
-  center: { lat: number; lng: number };
-  radiusMeters: number;
-  population: number;
-  averageDensity: number;
-  transitStops: number;
-  poiCount: number;
-  poiCategories: Record<string, number>;
-  contributingHex: string[];
-  sparklines: {
-    population: number[];
-    transit: number[];
-    pois: number[];
+export type StationMetrics = {
+  station: ApiStation;
+  utilization_history: UtilizationSnapshot[];
+  turnover: {
+    total_changes: number;
+    average_daily_changes: number;
+    days_count: number;
   };
 };
 
+export type NearbyDailyMetrics = {
+  date: string;
+  average_occupancy: number;
+  peak_load: number;
+  empty_events: number;
+  full_events: number;
+};
+
+export type NearbyStation = ApiStation & { distance_km: number };
+
+export type NearbyMetrics = {
+  center: { lat: number; lng: number; radius_km: number };
+  station_count: number;
+  stations: NearbyStation[];
+  daily_metrics: NearbyDailyMetrics[];
+  overall: {
+    average_occupancy: number;
+    peak_load: number;
+    empty_events: number;
+    full_events: number;
+  };
+};
 
 const BASE_URL = "/api/v1";
 
-export async function fetchApiStations(): Promise<ApiStation[]> {
-  const res = await fetch(`${BASE_URL}/stations`);
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(" Fehler /stations:", res.status, text);
-    throw new Error(`Fehler /stations: ${res.status}`);
+async function handleResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    const text = await response.text();
+    console.error("API error", response.status, text);
+    throw new Error(`API error ${response.status}`);
   }
 
-  const data = (await res.json()) as ApiStation[];
+  return (await response.json()) as T;
+}
+
+export async function fetchApiStations(cityUid?: number): Promise<ApiStation[]> {
+  const url = new URL(`${BASE_URL}/stations`, window.location.origin);
+  if (cityUid) {
+    url.searchParams.set("city_uid", cityUid.toString());
+  }
+
+  const res = await fetch(url.toString().replace(window.location.origin, ""));
+  const data = await handleResponse<ApiStation[]>(res);
   console.log(" /stations response:", data);
   return data;
 }
 
-export async function fetchContextLayers(): Promise<ContextLayers> {
-  const res = await fetch(`${BASE_URL}/context/layers`);
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Fehler /context/layers: ${res.status} ${text}`);
+export async function fetchStationMetrics(
+  stationId: number,
+  options?: { lookbackDays?: number },
+): Promise<StationMetrics> {
+  const params = new URLSearchParams();
+  if (options?.lookbackDays) {
+    params.set("lookback_days", options.lookbackDays.toString());
   }
 
-  return (await res.json()) as ContextLayers;
+  const res = await fetch(`${BASE_URL}/stations/${stationId}/metrics?${params.toString()}`);
+  return handleResponse<StationMetrics>(res);
 }
 
-export async function fetchContextSummary(
+export async function fetchNearbyMetrics(
   lat: number,
   lng: number,
-  radius = 600,
-): Promise<ContextSummary> {
-  const url = new URL(`${BASE_URL}/context/summary`, window.location.origin);
-  url.searchParams.set("lat", lat.toString());
-  url.searchParams.set("lng", lng.toString());
-  url.searchParams.set("radius", radius.toString());
+  radiusKm: number,
+  lookbackDays = 7,
+): Promise<NearbyMetrics> {
+  const params = new URLSearchParams({
+    lat: lat.toString(),
+    lng: lng.toString(),
+    radius_km: radiusKm.toString(),
+    lookback_days: lookbackDays.toString(),
+  });
 
-  const res = await fetch(url.toString());
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Fehler /context/summary: ${res.status} ${text}`);
-  }
-
-  return (await res.json()) as ContextSummary;
+  const res = await fetch(`${BASE_URL}/stations/metrics/nearby?${params.toString()}`);
+  return handleResponse<NearbyMetrics>(res);
 }

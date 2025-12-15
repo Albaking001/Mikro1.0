@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import MapComponent, { type MapStation } from "../components/MapComponent";
 import PlanningMap from "../features/planning/PlanningMap";
+import StationTelemetry from "../features/telemetry/StationTelemetry";
 
 import type { ApiStation } from "../services/api";
 import type { StationStatus } from "../data/stations";
@@ -22,6 +23,7 @@ const mapFromApi = (s: ApiStation): MapStation => ({
 
 const HomePage: React.FC = () => {
   const [stations, setStations] = useState<MapStation[]>([]);
+  const [apiStations, setApiStations] = useState<ApiStation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,6 +53,7 @@ const HomePage: React.FC = () => {
         console.log(" Mapped stations for map:", mapped);
 
         setStations(mapped);
+        setApiStations(data);
       } catch (err: unknown) {
         console.error(" Error loading stations:", err);
         setError(
@@ -75,7 +78,7 @@ const HomePage: React.FC = () => {
   }
 
   return (
-    <div>
+    <div className="space-y-8">
       {error && (
         <p style={{ color: "red", fontWeight: "bold" }}>
           Fehler beim Laden der Stationen: {error}
@@ -87,6 +90,8 @@ const HomePage: React.FC = () => {
       </p>
 
       <MapComponent stations={stations} />
+
+      {apiStations.length > 0 && <StationTelemetry stations={apiStations} />}
 
       <PlanningMap />
 
