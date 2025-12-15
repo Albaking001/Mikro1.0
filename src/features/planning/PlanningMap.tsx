@@ -8,6 +8,13 @@ import {
   initializeStations,
   type PlanningStation,
 } from "../../store/planningSlice";
+import PlanningSidebar from "./PlanningSidebar";
+import {
+  fetchContextLayers,
+  fetchContextSummary,
+  type ContextLayers,
+  type ContextSummary,
+} from "../../services/api";
 
 const defaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -62,7 +69,13 @@ const PlanningMap: React.FC = () => {
     () => createPlanningActions(() => stations, setStations),
     [stations],
   );
+  const [layers, setLayers] = useState<ContextLayers | null>(null);
+  const [summary, setSummary] = useState<ContextSummary | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [loadingLayers, setLoadingLayers] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const pendingLookup = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
 
   const handleReverseGeocode = (stationId: string, lat: number, lng: number) => {
     if (pendingLookup.current) {
@@ -87,11 +100,46 @@ const PlanningMap: React.FC = () => {
     }
   }, []);
 
+  useEffect(() => {
+    async function loadLayers() {
+      try {
+        setLoadingLayers(true);
+        const response = await fetchContextLayers();
+        setLayers(response);
+      } catch (layerError) {
+        console.error("Failed to load context layers", layerError);
+        setError("Layer konnten nicht geladen werden");
+      } finally {
+        setLoadingLayers(false);
+      }
+    }
+
+    void loadLayers();
+  }, []);
+
+  const loadSummary = async (lat: number, lng: number) => {
+    try {
+      setLoadingSummary(true);
+      setError(null);
+      const res = await fetchContextSummary(lat, lng, 700);
+      setSummary(res);
+    } catch (summaryError) {
+      console.error("Failed to fetch context summary", summaryError);
+      setError("Kontext konnte nicht geladen werden");
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
   const createStation = (lat: number, lng: number) => {
     const fallbackLabel = `Geplanter Standort (${formatCoordinate(lat)}, ${formatCoordinate(lng)})`;
     const stationId = actions.addStation({ lat, lng, label: fallbackLabel });
+    setSelectedStationId(stationId);
     handleReverseGeocode(stationId, lat, lng);
+    void loadSummary(lat, lng);
   };
+
+  const selectedStation = stations.find((station) => station.id === selectedStationId);
 
   const markers = stations.map((station) => (
     <Marker key={station.id} position={[station.lat, station.lng]}>
@@ -121,7 +169,11 @@ const PlanningMap: React.FC = () => {
           {stations.length > 0 && (
             <button
               type="button"
-              onClick={() => actions.clearStations()}
+              onClick={() => {
+                actions.clearStations();
+                setSummary(null);
+                setSelectedStationId(null);
+              }}
               style={{
                 border: "1px solid #d1d5db",
                 background: "#f9fafb",
@@ -136,19 +188,36 @@ const PlanningMap: React.FC = () => {
         </div>
       </header>
 
-      <div style={{ height: "420px", borderRadius: "12px", overflow: "hidden", border: "1px solid #e5e7eb" }}>
-        <MapContainer
-          center={[49.992863, 8.247263]}
-          zoom={12}
-          style={{ height: "100%", width: "100%" }}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <MapClickHandler onCreateStation={createStation} />
-          {markers}
-        </MapContainer>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr",
+          gap: "1rem",
+          alignItems: "start",
+        }}
+      >
+        <div style={{ height: "440px", borderRadius: "12px", overflow: "hidden", border: "1px solid #e5e7eb" }}>
+          <MapContainer
+            center={[49.992863, 8.247263]}
+            zoom={12}
+            style={{ height: "100%", width: "100%" }}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <MapClickHandler onCreateStation={createStation} />
+            {markers}
+          </MapContainer>
+        </div>
+
+        <PlanningSidebar
+          selectedLabel={selectedStation?.label}
+          summary={summary}
+          layers={layers}
+          loading={loadingSummary || loadingLayers}
+          error={error}
+        />
       </div>
     </section>
   );
