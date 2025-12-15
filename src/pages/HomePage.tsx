@@ -1,6 +1,7 @@
 // src/pages/HomePage.tsx
 import React, { useEffect, useState } from "react";
 import MapComponent, { type MapStation } from "../components/MapComponent";
+import PlanningMap from "../features/planning/PlanningMap";
 
 import type { ApiStation } from "../services/api";
 import type { StationStatus } from "../data/stations";
@@ -86,6 +87,8 @@ const HomePage: React.FC = () => {
       </p>
 
       <MapComponent stations={stations} />
+
+      <PlanningMap />
 
       <p style={{ marginTop: "1rem", fontSize: "12px", color: "#555" }}>
         Debug: stations.length = {stations.length}
