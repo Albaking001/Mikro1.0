@@ -12,39 +12,67 @@ const QUERY_PARAM = "planning";
 const parseStations = (value: string | null): PlanningStation[] | null => {
   if (!value) return null;
 
+  const candidates = [value];
+
+  // Backward compatibility: older versions stored an encoded payload.
   try {
-    const decoded = decodeURIComponent(value);
-    const parsed = JSON.parse(decoded) as PlanningStation[];
-
-    if (Array.isArray(parsed)) {
-      return parsed.filter((entry) =>
-        typeof entry.lat === "number" &&
-        typeof entry.lng === "number" &&
-        typeof entry.id === "string",
-      );
-    }
-
-    return null;
+    candidates.push(decodeURIComponent(value));
   } catch (error) {
-    console.error("Failed to parse planning stations", error);
-    return null;
+    console.warn("Skipping URI decoding for planning stations", error);
   }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as PlanningStation[];
+
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter(
+            (entry) =>
+              typeof entry.lat === "number" &&
+              typeof entry.lng === "number" &&
+              typeof entry.id === "string",
+          )
+          .map((entry) => ({
+            ...entry,
+            createdAt: typeof entry.createdAt === "number" ? entry.createdAt : Date.now(),
+          }));
+      }
+    } catch (error) {
+      console.error("Failed to parse planning stations", error);
+    }
+  }
+
+  return null;
 };
 
 const loadFromQuery = () => {
+  if (typeof window === "undefined") return null;
+
   const params = new URLSearchParams(window.location.search);
   return parseStations(params.get(QUERY_PARAM));
 };
 
-const loadFromStorage = () => parseStations(localStorage.getItem(STORAGE_KEY));
+const loadFromStorage = () => {
+  if (typeof window === "undefined" || !("localStorage" in window)) return null;
+
+  try {
+    return parseStations(window.localStorage.getItem(STORAGE_KEY));
+  } catch (error) {
+    console.error("Failed to load planning stations from storage", error);
+    return null;
+  }
+};
 
 const updateUrl = (stations: PlanningStation[]) => {
+  if (typeof window === "undefined") return;
+
   const params = new URLSearchParams(window.location.search);
 
   if (stations.length === 0) {
     params.delete(QUERY_PARAM);
   } else {
-    params.set(QUERY_PARAM, encodeURIComponent(JSON.stringify(stations)));
+    params.set(QUERY_PARAM, JSON.stringify(stations));
   }
 
   const newSearch = params.toString();
@@ -56,7 +84,10 @@ const updateUrl = (stations: PlanningStation[]) => {
 };
 
 const persistStations = (stations: PlanningStation[]) => {
-  localStorage.setItem(STORAGE_KEY, encodeURIComponent(JSON.stringify(stations)));
+  if (typeof window !== "undefined" && "localStorage" in window) {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stations));
+  }
+
   updateUrl(stations);
 };
 
@@ -70,7 +101,9 @@ export const initializeStations = (): PlanningStation[] => {
   if (fromQuery) return fromQuery;
 
   const fromStorage = loadFromStorage();
-  return fromStorage ?? [];
+  if (fromStorage) return fromStorage;
+
+  return [];
 };
 
 export type PlanningActions = {
