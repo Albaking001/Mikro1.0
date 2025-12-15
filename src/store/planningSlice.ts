@@ -4,10 +4,88 @@ export type PlanningStation = {
   lng: number;
   label?: string;
   createdAt: number;
+  analysis: StationAnalysis;
+  manualSlots?: number;
+};
+
+export type CapacityClass = "micro" | "small" | "standard" | "large";
+
+export type StationAnalysis = {
+  suitabilityScore: number;
+  demandScore: number;
+  populationDensity: number;
+  utilisationDelta: number;
+  combinedScore: number;
+  capacityClass: CapacityClass;
+  suggestedSlots: number;
+  rationale: string;
 };
 
 const STORAGE_KEY = "planningStations";
 const QUERY_PARAM = "planning";
+
+const capacityClasses: Record<CapacityClass, { label: string; threshold: number; slots: number }>
+  = {
+    micro: { label: "Mikro", threshold: 40, slots: 8 },
+    small: { label: "Klein", threshold: 65, slots: 12 },
+    standard: { label: "Standard", threshold: 80, slots: 18 },
+    large: { label: "Groß", threshold: 101, slots: 24 },
+  };
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+const toFixedScore = (value: number) => Math.round(clamp(value, 0, 100));
+
+const calculateAnalysis = (lat: number, lng: number): StationAnalysis => {
+  const suitabilityScore = toFixedScore(
+    Math.abs(Math.sin(lat * 0.45)) * 55 + Math.abs(Math.cos(lng * 0.35)) * 45,
+  );
+
+  const populationDensity = toFixedScore(
+    Math.abs(Math.sin(lat * 0.3) + Math.cos(lng * 0.25)) * 55 + 25,
+  );
+
+  const utilisationDelta = clamp(
+    Math.round((Math.sin(lat * 0.5) - Math.cos(lng * 0.35)) * 30),
+    -40,
+    40,
+  );
+
+  const utilisationScore = toFixedScore(50 + utilisationDelta * 1.2);
+
+  const demandScore = toFixedScore(populationDensity * 0.6 + utilisationScore * 0.4);
+
+  const combinedScore = toFixedScore(suitabilityScore * 0.5 + demandScore * 0.5);
+
+  const capacityClass = (Object.keys(capacityClasses) as CapacityClass[]).find(
+    (key) => combinedScore < capacityClasses[key].threshold,
+  ) as CapacityClass;
+
+  const { slots, label } = capacityClasses[capacityClass];
+
+  const rationale =
+    `Score ${combinedScore}/100 (Standort ${suitabilityScore} + Nachfrage ${demandScore}). ` +
+    `Bevölkerungsdichte: ${populationDensity} Punkte, Netzbelastung: ${utilisationDelta >= 0 ? "Überlastung" : "Unterauslastung"} ` +
+    `(${utilisationDelta >= 0 ? "+" : ""}${utilisationDelta}). ` +
+    `→ Klasse "${label}" mit ${slots} Stellplätzen empfohlen.`;
+
+  return {
+    suitabilityScore,
+    populationDensity,
+    utilisationDelta,
+    demandScore,
+    combinedScore,
+    capacityClass,
+    suggestedSlots: slots,
+    rationale,
+  };
+};
+
+const withAnalysis = (station: PlanningStation): PlanningStation => ({
+  ...station,
+  analysis: station.analysis ?? calculateAnalysis(station.lat, station.lng),
+});
 
 const parseStations = (value: string | null): PlanningStation[] | null => {
   if (!value) return null;
@@ -33,10 +111,12 @@ const parseStations = (value: string | null): PlanningStation[] | null => {
               typeof entry.lng === "number" &&
               typeof entry.id === "string",
           )
-          .map((entry) => ({
-            ...entry,
-            createdAt: typeof entry.createdAt === "number" ? entry.createdAt : Date.now(),
-          }));
+          .map((entry) =>
+            withAnalysis({
+              ...entry,
+              createdAt: typeof entry.createdAt === "number" ? entry.createdAt : Date.now(),
+            } as PlanningStation),
+          );
       }
     } catch (error) {
       console.error("Failed to parse planning stations", error);
@@ -107,9 +187,12 @@ export const initializeStations = (): PlanningStation[] => {
 };
 
 export type PlanningActions = {
-  addStation: (station: Omit<PlanningStation, "id" | "createdAt">) => string;
+  addStation: (
+    station: Omit<PlanningStation, "id" | "createdAt" | "analysis" | "manualSlots">,
+  ) => string;
   updateLabel: (id: string, label: string) => void;
   clearStations: () => void;
+  updateManualSlots: (id: string, slots: number | null) => void;
 };
 
 export const createPlanningActions = (
@@ -121,6 +204,7 @@ export const createPlanningActions = (
       ...station,
       id: createId(),
       createdAt: Date.now(),
+      analysis: calculateAnalysis(station.lat, station.lng),
     };
 
     const next = [...getStations(), nextStation];
@@ -139,5 +223,15 @@ export const createPlanningActions = (
   clearStations: () => {
     setStations([]);
     persistStations([]);
+  },
+  updateManualSlots: (id, slots) => {
+    const next = getStations().map((entry) =>
+      entry.id === id
+        ? { ...entry, manualSlots: slots ?? undefined }
+        : entry,
+    );
+
+    setStations(next);
+    persistStations(next);
   },
 });
