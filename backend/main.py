@@ -41,7 +41,7 @@ def root():
     }
 
 
-@app.get("/.well-known/appspecific/{probe}.json", include_in_schema=False)
+@app.get("/.well-known/appspecific/{probe:path}", include_in_schema=False)
 def devtools_placeholder(probe: str):
     """Return a minimal response for Chromium-based DevTools probes (Chrome, Edge)."""
 
