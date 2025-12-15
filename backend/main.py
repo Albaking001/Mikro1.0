@@ -22,6 +22,7 @@ wait_for_database(engine)
 refresh_collation_version(engine)
 
 with SessionLocal() as session:
+    refresh_collation_version(session)
     ensure_postgis(session)
 
 Base.metadata.create_all(bind=engine)
