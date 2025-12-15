@@ -21,6 +21,25 @@ export type StationAnalysis = {
   rationale: string;
 };
 
+export type ExistingStation = {
+  id: string;
+  lat: number;
+  lng: number;
+  name?: string;
+  capacity?: number;
+  /**
+   * Coverage radius in meters. Defaults to a conservative 400m and can be
+   * adjusted per station to reflect higher capacities (max. 500m).
+   */
+  coverageRadiusMeters: number;
+};
+
+export type NearestStationHit = ExistingStation & { distanceMeters: number };
+
+export const DEFAULT_COVERAGE_RADIUS_METERS = 400;
+
+type Bounds = { minLat: number; maxLat: number; minLng: number; maxLng: number };
+
 const STORAGE_KEY = "planningStations";
 const QUERY_PARAM = "planning";
 
@@ -175,6 +194,250 @@ const createId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const toRadians = (value: number) => (value * Math.PI) / 180;
+const toDegrees = (value: number) => (value * 180) / Math.PI;
+
+export const haversineDistanceMeters = (
+  origin: { lat: number; lng: number },
+  target: { lat: number; lng: number },
+): number => {
+  const R = 6371000; // meters
+  const dLat = toRadians(target.lat - origin.lat);
+  const dLng = toRadians(target.lng - origin.lng);
+  const lat1 = toRadians(origin.lat);
+  const lat2 = toRadians(target.lat);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+};
+
+const moveByBearing = (
+  lat: number,
+  lng: number,
+  distanceMeters: number,
+  bearingDegrees: number,
+): [number, number] => {
+  const R = 6371000;
+  const bearing = toRadians(bearingDegrees);
+  const latRad = toRadians(lat);
+  const lngRad = toRadians(lng);
+  const angularDistance = distanceMeters / R;
+
+  const destLat = Math.asin(
+    Math.sin(latRad) * Math.cos(angularDistance) +
+      Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearing),
+  );
+
+  const destLng =
+    lngRad +
+    Math.atan2(
+      Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latRad),
+      Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(destLat),
+    );
+
+  return [toDegrees(destLat), toDegrees(destLng)];
+};
+
+type KdNode = {
+  station: ExistingStation;
+  left: KdNode | null;
+  right: KdNode | null;
+  axis: "lat" | "lng";
+};
+
+const buildKdTree = (stations: ExistingStation[], depth = 0): KdNode | null => {
+  if (stations.length === 0) return null;
+
+  const axis: "lat" | "lng" = depth % 2 === 0 ? "lat" : "lng";
+  const sorted = [...stations].sort((a, b) => a[axis] - b[axis]);
+  const median = Math.floor(sorted.length / 2);
+
+  return {
+    station: sorted[median],
+    axis,
+    left: buildKdTree(sorted.slice(0, median), depth + 1),
+    right: buildKdTree(sorted.slice(median + 1), depth + 1),
+  };
+};
+
+export const createNearestNeighborSearcher = (stations: ExistingStation[]) => {
+  const tree = buildKdTree(stations);
+
+  const search = (
+    target: { lat: number; lng: number },
+    limit: number,
+  ): NearestStationHit[] => {
+    const best: NearestStationHit[] = [];
+
+    const tryInsert = (candidate: ExistingStation) => {
+      const distanceMeters = haversineDistanceMeters(target, candidate);
+      const nextEntry: NearestStationHit = { ...candidate, distanceMeters };
+      best.push(nextEntry);
+      best.sort((a, b) => a.distanceMeters - b.distanceMeters);
+      if (best.length > limit) {
+        best.pop();
+      }
+    };
+
+    const traverse = (node: KdNode | null) => {
+      if (!node) return;
+
+      tryInsert(node.station);
+
+      const axis = node.axis;
+      const delta = target[axis] - node.station[axis];
+      const primary = delta < 0 ? node.left : node.right;
+      const secondary = delta < 0 ? node.right : node.left;
+
+      traverse(primary);
+
+      const worstDistance = best[best.length - 1]?.distanceMeters ?? Infinity;
+      const axisDistanceMeters =
+        axis === "lat"
+          ? haversineDistanceMeters(target, { ...target, lat: node.station.lat })
+          : haversineDistanceMeters(target, { ...target, lng: node.station.lng });
+
+      if (best.length < limit || axisDistanceMeters < worstDistance) {
+        traverse(secondary);
+      }
+    };
+
+    traverse(tree);
+    return best;
+  };
+
+  return search;
+};
+
+export const mapExistingStations = (
+  stations: Array<{
+    id: number | string;
+    name?: string;
+    lat: number;
+    lng: number;
+    capacity?: number;
+  }>,
+): ExistingStation[] =>
+  stations.map((station) => {
+    const capacityScore = Math.min(Math.max(station.capacity ?? 0, 0), 20);
+    const coverageRadiusMeters =
+      DEFAULT_COVERAGE_RADIUS_METERS + (capacityScore / 20) * 100;
+
+    return {
+      id: station.id.toString(),
+      lat: station.lat,
+      lng: station.lng,
+      name: station.name,
+      capacity: station.capacity,
+      coverageRadiusMeters: Math.min(coverageRadiusMeters, 500),
+    } satisfies ExistingStation;
+  });
+
+const computeBounds = (points: Array<{ lat: number; lng: number }>): Bounds | null => {
+  if (points.length === 0) return null;
+
+  return points.reduce<Bounds>(
+    (acc, point) => ({
+      minLat: Math.min(acc.minLat, point.lat),
+      maxLat: Math.max(acc.maxLat, point.lat),
+      minLng: Math.min(acc.minLng, point.lng),
+      maxLng: Math.max(acc.maxLng, point.lng),
+    }),
+    {
+      minLat: points[0].lat,
+      maxLat: points[0].lat,
+      minLng: points[0].lng,
+      maxLng: points[0].lng,
+    },
+  );
+};
+
+export const expandBounds = (bounds: Bounds, paddingMeters: number): Bounds => {
+  const metersPerDegreeLat = 111320;
+  const centerLat = (bounds.minLat + bounds.maxLat) / 2;
+  const metersPerDegreeLng = 111320 * Math.cos(toRadians(centerLat));
+
+  const latDelta = paddingMeters / metersPerDegreeLat;
+  const lngDelta = paddingMeters / metersPerDegreeLng;
+
+  return {
+    minLat: bounds.minLat - latDelta,
+    maxLat: bounds.maxLat + latDelta,
+    minLng: bounds.minLng - lngDelta,
+    maxLng: bounds.maxLng + lngDelta,
+  };
+};
+
+export const hexagonAround = (
+  center: { lat: number; lng: number },
+  radiusMeters: number,
+): [number, number][] => {
+  const vertices: [number, number][] = [];
+  for (let i = 0; i < 6; i += 1) {
+    vertices.push(moveByBearing(center.lat, center.lng, radiusMeters, i * 60));
+  }
+  return vertices;
+};
+
+export const buildHexGrid = (
+  points: Array<{ lat: number; lng: number }>,
+  cellRadiusMeters: number,
+): { id: string; polygon: [number, number][]; center: [number, number] }[] => {
+  const bounds = computeBounds(points);
+  if (!bounds) return [];
+
+  const expanded = expandBounds(bounds, cellRadiusMeters * 2);
+  const metersPerDegreeLat = 111320;
+  const centerLat = (expanded.minLat + expanded.maxLat) / 2;
+  const metersPerDegreeLng = 111320 * Math.cos(toRadians(centerLat));
+
+  const latStep = (Math.sqrt(3) * cellRadiusMeters) / metersPerDegreeLat;
+  const lngStep = (1.5 * cellRadiusMeters) / metersPerDegreeLng;
+  const lngOffset = cellRadiusMeters / metersPerDegreeLng;
+
+  const cells: { id: string; polygon: [number, number][]; center: [number, number] }[] = [];
+
+  let row = 0;
+  for (let lat = expanded.minLat; lat <= expanded.maxLat + latStep; lat += latStep) {
+    const isOddRow = row % 2 === 1;
+    const startLng = expanded.minLng + (isOddRow ? lngOffset : 0);
+
+    for (let lng = startLng; lng <= expanded.maxLng + lngStep; lng += lngStep) {
+      const center: [number, number] = [lat, lng];
+      const polygon = hexagonAround({ lat, lng }, cellRadiusMeters);
+      cells.push({
+        id: `${row}-${polygon[0][0].toFixed(4)}-${polygon[0][1].toFixed(4)}`,
+        polygon,
+        center,
+      });
+    }
+
+    row += 1;
+  }
+
+  return cells;
+};
+
+export const markCoverageGaps = (
+  cells: { id: string; polygon: [number, number][]; center: [number, number] }[],
+  stations: ExistingStation[],
+): Array<{ id: string; polygon: [number, number][]; center: [number, number]; covered: boolean }> =>
+  cells.map((cell) => {
+    const center = { lat: cell.center[0], lng: cell.center[1] };
+    const covered = stations.some((station) =>
+      haversineDistanceMeters(center, station) <= station.coverageRadiusMeters,
+    );
+
+    return {
+      ...cell,
+      covered,
+    };
+  });
 
 export const initializeStations = (): PlanningStation[] => {
   const fromQuery = loadFromQuery();
