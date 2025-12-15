@@ -41,8 +41,8 @@ def root():
     }
 
 
-@app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
-def chrome_devtools_placeholder():
-    """Return a minimal response to avoid noisy 404s from Chrome DevTools probes."""
+@app.get("/.well-known/appspecific/{probe}.json", include_in_schema=False)
+def devtools_placeholder(probe: str):
+    """Return a minimal response for Chromium-based DevTools probes (Chrome, Edge)."""
 
-    return {"status": "ok"}
+    return {"status": "ok", "probe": probe}
