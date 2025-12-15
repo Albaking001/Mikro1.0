@@ -1,14 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Circle,
-  MapContainer,
-  Marker,
-  Polygon,
-  Popup,
-  TileLayer,
-  Tooltip,
-  useMapEvents,
-} from "react-leaflet";
+import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -26,10 +17,12 @@ import {
   type CapacityClass,
 } from "../../store/planningSlice";
 import {
-  computeScore,
-  type RawMetricInput,
-  type ScoreBandId,
-} from "../../services/scoring/model";
+  DEFAULT_WEIGHTS,
+  computeHeatPoints,
+  createBaseGrid,
+  type HeatPoint,
+  type PotentialWeights,
+} from "./potentialModel";
 
 const defaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -147,17 +140,10 @@ const PlanningMap: React.FC = () => {
   );
   const [overrideInputs, setOverrideInputs] = useState<Record<string, string>>({});
   const pendingLookup = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
-
-  const scoredStations = useMemo(
-    () =>
-      stations.map((station) => {
-        const metrics = deriveMetricsFromCoordinates(station.lat, station.lng);
-        const evaluation = computeScore(metrics);
-
-        return { station, metrics, evaluation };
-      }),
-    [stations],
+  const [weights, setWeights] = useState<PotentialWeights>(DEFAULT_WEIGHTS);
+  const baseGrid = useMemo(() => createBaseGrid(), []);
+  const [heatPoints, setHeatPoints] = useState<HeatPoint[]>(() =>
+    computeHeatPoints(baseGrid, stations, weights),
   );
 
   const handleReverseGeocode = (stationId: string, lat: number, lng: number) => {
@@ -184,35 +170,12 @@ const PlanningMap: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    async function loadLayers() {
-      try {
-        setLoadingLayers(true);
-        const response = await fetchContextLayers();
-        setLayers(response);
-      } catch (layerError) {
-        console.error("Failed to load context layers", layerError);
-        setError("Layer konnten nicht geladen werden");
-      } finally {
-        setLoadingLayers(false);
-      }
-    }
+    const debounceHandle = setTimeout(() => {
+      setHeatPoints(computeHeatPoints(baseGrid, stations, weights));
+    }, 200);
 
-    void loadLayers();
-  }, []);
-
-  const loadSummary = async (lat: number, lng: number) => {
-    try {
-      setLoadingSummary(true);
-      setError(null);
-      const res = await fetchContextSummary(lat, lng, 700);
-      setSummary(res);
-    } catch (summaryError) {
-      console.error("Failed to fetch context summary", summaryError);
-      setError("Kontext konnte nicht geladen werden");
-    } finally {
-      setLoadingSummary(false);
-    }
-  };
+    return () => clearTimeout(debounceHandle);
+  }, [baseGrid, stations, weights]);
 
   const createStation = (lat: number, lng: number) => {
     const fallbackLabel = `Geplanter Standort (${formatCoordinate(lat)}, ${formatCoordinate(lng)})`;
@@ -301,6 +264,10 @@ const PlanningMap: React.FC = () => {
           automatisch in der URL und im lokalen Speicher gespeichert. Bestehende Stationen werden
           zur Lücken- und Nachbarschaftsanalyse automatisch geladen.
         </p>
+        <p style={{ margin: "0.25rem 0", color: "#4b5563" }}>
+          Die Heatmap zeigt das aktuelle Potenzial basierend auf Bevölkerung, Points of Interest,
+          ÖPNV-Knoten und Abdeckung durch simulierte Stationen.
+        </p>
         <div style={{ fontSize: "14px", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
           <span>Aktive Stationen: {stations.length}</span>
           <span>
@@ -326,11 +293,36 @@ const PlanningMap: React.FC = () => {
             </button>
           )}
         </div>
-        {loadError && (
-          <div style={{ marginTop: "0.5rem", color: "#b91c1c", fontSize: "14px" }}>
-            Fehler beim Laden der Bestandsstationen: {loadError}
-          </div>
-        )}
+        <div
+          style={{
+            marginTop: "0.75rem",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "0.75rem",
+          }}
+        >
+          <WeightSlider
+            label="Bevölkerungsdichte"
+            value={weights.population}
+            onChange={(value) => setWeights((current) => ({ ...current, population: value }))}
+          />
+          <WeightSlider
+            label="Points of Interest"
+            value={weights.poi}
+            onChange={(value) => setWeights((current) => ({ ...current, poi: value }))}
+          />
+          <WeightSlider
+            label="ÖPNV-Anbindung"
+            value={weights.transit}
+            onChange={(value) => setWeights((current) => ({ ...current, transit: value }))}
+          />
+          <WeightSlider
+            label="Deckungslücken"
+            helper="Erhöht Potenzial in nicht abgedeckten Bereichen"
+            value={weights.coverage}
+            onChange={(value) => setWeights((current) => ({ ...current, coverage: value }))}
+          />
+        </div>
       </header>
 
       <div
@@ -374,135 +366,14 @@ const PlanningMap: React.FC = () => {
             gap: "0.75rem",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <h3 style={{ margin: 0 }}>Kapazitätsvorschläge</h3>
-              <p style={{ margin: "0.25rem 0", color: "#4b5563" }}>
-                Score + Nachfrage ergeben eine diskrete Kapazitätsklasse. Vorschlag kann manuell überschrieben werden.
-              </p>
-            </div>
-          </div>
-
-          {stations.length === 0 ? (
-            <p style={{ margin: 0, color: "#4b5563" }}>
-              Noch keine geplanten Standorte. Klicken Sie in die Karte, um zu starten.
-            </p>
-          ) : (
-            stations.map((station) => {
-              const suggestedSlots = station.analysis.suggestedSlots;
-              const plannedSlots = station.manualSlots ?? suggestedSlots;
-
-              return (
-                <div
-                  key={station.id}
-                  style={{
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "10px",
-                    padding: "0.75rem",
-                    background: "#f9fafb",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.35rem",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
-                    <div>
-                      <div style={{ fontWeight: 700 }}>{station.label ?? "Neuer Standort"}</div>
-                      <div style={{ color: "#4b5563", fontSize: "12px" }}>
-                        {formatCoordinate(station.lat)}, {formatCoordinate(station.lng)}
-                      </div>
-                    </div>
-                    <span
-                      style={{
-                        background: "#e5e7eb",
-                        borderRadius: "8px",
-                        padding: "0.25rem 0.5rem",
-                        fontSize: "12px",
-                      }}
-                    >
-                      {capacityClassLabels[station.analysis.capacityClass]}
-                    </span>
-                  </div>
-
-                  <div style={{ color: "#1f2937", fontSize: "14px" }}>
-                    Vorschlag: <strong>{suggestedSlots}</strong> Stellplätze
-                    {station.manualSlots ? " (manuell überschrieben)" : ""}
-                  </div>
-
-                  <div style={{ fontSize: "12px", color: "#374151", lineHeight: 1.4 }}>
-                    <div>Score gesamt: {station.analysis.combinedScore} / 100</div>
-                    <div>
-                      Nachfrage-Proxy: Bevölkerungsdichte {station.analysis.populationDensity}, Netzlast {station.analysis.utilisationDelta >= 0 ? "über" : "unter"}-ausgelastet ({station.analysis.utilisationDelta >= 0 ? "+" : ""}
-                      {station.analysis.utilisationDelta})
-                    </div>
-                    <div>Begründung: {station.analysis.rationale}</div>
-                  </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "0.5rem", alignItems: "center" }}>
-                    <input
-                      type="number"
-                      min={1}
-                      value={overrideInputs[station.id] ?? ""}
-                      onChange={(event) =>
-                        setOverrideInputs((current) => ({
-                          ...current,
-                          [station.id]: event.target.value,
-                        }))
-                      }
-                      placeholder={suggestedSlots.toString()}
-                      style={{
-                        border: "1px solid #d1d5db",
-                        borderRadius: "8px",
-                        padding: "0.5rem",
-                        fontSize: "14px",
-                      }}
-                    />
-                    <div style={{ display: "flex", gap: "0.35rem" }}>
-                      <button
-                        type="button"
-                        onClick={() => applyManualSlots(station.id)}
-                        style={{
-                          border: "1px solid #d1d5db",
-                          background: "white",
-                          padding: "0.45rem 0.65rem",
-                          borderRadius: "8px",
-                          cursor: "pointer",
-                        }}
-                      >
-                        Speichern
-                      </button>
-                      {station.manualSlots && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOverrideInputs((current) => ({
-                              ...current,
-                              [station.id]: suggestedSlots.toString(),
-                            }));
-                            actions.updateManualSlots(station.id, null);
-                          }}
-                          style={{
-                            border: "1px solid #d1d5db",
-                            background: "#f3f4f6",
-                            padding: "0.45rem 0.65rem",
-                            borderRadius: "8px",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Vorschlag nutzen
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: "12px", color: "#4b5563" }}>
-                    Aktueller Plan: <strong>{plannedSlots} Plätze</strong>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </aside>
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <MapClickHandler onCreateStation={createStation} />
+          <PotentialHeatLayer points={heatPoints} />
+          {markers}
+        </MapContainer>
       </div>
 
       {scoredStations.length > 0 && (
@@ -687,3 +558,90 @@ const MetricBadge: React.FC<MetricBadgeProps> = ({ label, value }) => (
 );
 
 export default PlanningMap;
+
+type WeightSliderProps = {
+  label: string;
+  value: number;
+  helper?: string;
+  onChange: (value: number) => void;
+};
+
+function WeightSlider({ label, value, helper, onChange }: WeightSliderProps) {
+  return (
+    <label
+      style={{
+        border: "1px solid #e5e7eb",
+        borderRadius: "10px",
+        padding: "0.75rem",
+        background: "#f9fafb",
+        display: "grid",
+        gap: "0.25rem",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem" }}>
+        <span style={{ fontWeight: 600 }}>{label}</span>
+        <span style={{ fontVariantNumeric: "tabular-nums", color: "#111827" }}>
+          {value.toFixed(2)}
+        </span>
+      </div>
+      {helper ? (
+        <span style={{ fontSize: "12px", color: "#4b5563" }}>{helper}</span>
+      ) : null}
+      <input
+        type="range"
+        min={0}
+        max={1.5}
+        step={0.05}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
+  );
+}
+
+function PotentialHeatLayer({ points }: { points: HeatPoint[] }) {
+  const map = useMap();
+  const layerRef = useRef<L.LayerGroup | null>(null);
+
+  useEffect(() => {
+    if (!map) return;
+
+    if (!layerRef.current) {
+      layerRef.current = L.layerGroup().addTo(map);
+    }
+
+    return () => {
+      layerRef.current?.remove();
+      layerRef.current = null;
+    };
+  }, [map]);
+
+  useEffect(() => {
+    if (!layerRef.current) return;
+
+    const intensityToColor = (intensity: number) => {
+      const value = Math.min(1, intensity);
+      if (value < 0.3) return "#60a5fa";
+      if (value < 0.55) return "#3b82f6";
+      if (value < 0.75) return "#f59e0b";
+      return "#ef4444";
+    };
+
+    layerRef.current.clearLayers();
+    points.forEach(([lat, lng, intensity]) => {
+      const radius = 14 + intensity * 12;
+      const color = intensityToColor(intensity);
+
+      L.circleMarker([lat, lng], {
+        radius,
+        color,
+        fillColor: color,
+        fillOpacity: Math.min(0.75, 0.35 + intensity * 0.35),
+        opacity: 0,
+        interactive: false,
+      }).addTo(layerRef.current as L.LayerGroup);
+    });
+  }, [points]);
+
+  return null;
+}
