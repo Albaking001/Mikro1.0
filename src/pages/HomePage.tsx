@@ -1,11 +1,11 @@
 // src/pages/HomePage.tsx
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useState, lazy } from "react";
 import MapComponent, { type MapStation } from "../components/MapComponent";
-import PlanningMap from "../features/planning/PlanningMap";
-import StationTelemetry from "../features/telemetry/StationTelemetry";
 
 import type { ApiStation } from "../services/api";
 import type { StationStatus } from "../data/stations";
+
+const PlanningMap = lazy(() => import("../features/planning/PlanningMap"));
 
 const inferStatus = (capacity: number): StationStatus =>
   capacity > 0 ? "in_betrieb" : "planung";
@@ -27,16 +27,13 @@ const HomePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
+  const fetchStations = useCallback(
+    async (signal?: AbortSignal) => {
       try {
         setError(null);
         setLoading(true);
 
-        
-        const res = await fetch("/api/v1/stations?city_uid=160");
+        const res = await fetch("/api/v1/stations?city_uid=160", { signal });
 
         if (!res.ok) {
           const text = await res.text();
@@ -47,7 +44,7 @@ const HomePage: React.FC = () => {
         const data = (await res.json()) as ApiStation[];
         console.log(" API /stations?city_uid=160 data:", data);
 
-        if (cancelled) return;
+        if (signal?.aborted) return;
 
         const mapped = data.map(mapFromApi);
         console.log(" Mapped stations for map:", mapped);
@@ -55,35 +52,66 @@ const HomePage: React.FC = () => {
         setStations(mapped);
         setApiStations(data);
       } catch (err: unknown) {
+        if (signal?.aborted) return;
         console.error(" Error loading stations:", err);
         setError(
           err instanceof Error ? err.message : "Unbekannter Fehler beim Laden",
         );
       } finally {
-        if (!cancelled) {
+        if (!signal?.aborted) {
           setLoading(false);
         }
       }
-    }
+    },
+    [],
+  );
 
-    load();
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchStations(controller.signal);
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    return () => controller.abort();
+  }, [fetchStations]);
 
-  if (loading) {
-    return <p>Stationen werden geladen...</p>;
-  }
+  const handleReload = () => fetchStations();
 
   return (
-    <div className="space-y-8">
-      {error && (
-        <p style={{ color: "red", fontWeight: "bold" }}>
-          Fehler beim Laden der Stationen: {error}
-        </p>
-      )}
+    <div>
+      {loading ? (
+        <p style={{ fontWeight: "bold" }}>Stationen werden geladen...</p>
+      ) : null}
+
+      {error ? (
+        <div
+          style={{
+            color: "#991b1b",
+            background: "#fee2e2",
+            border: "1px solid #fecdd3",
+            borderRadius: "8px",
+            padding: "12px",
+            marginBottom: "12px",
+          }}
+        >
+          <p style={{ fontWeight: "bold", margin: 0 }}>
+            Fehler beim Laden der Stationen: {error}
+          </p>
+          <button
+            type="button"
+            onClick={handleReload}
+            style={{
+              marginTop: "8px",
+              background: "#991b1b",
+              color: "white",
+              padding: "6px 10px",
+              borderRadius: "6px",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            Erneut laden
+          </button>
+        </div>
+      ) : null}
 
       <p>
         <strong>Geladene Stationen:</strong> {stations.length}
@@ -91,9 +119,9 @@ const HomePage: React.FC = () => {
 
       <MapComponent stations={stations} />
 
-      {apiStations.length > 0 && <StationTelemetry stations={apiStations} />}
-
-      <PlanningMap />
+      <Suspense fallback={<p>Planungskarte wird geladen...</p>}>
+        <PlanningMap />
+      </Suspense>
 
       <p style={{ marginTop: "1rem", fontSize: "12px", color: "#555" }}>
         Debug: stations.length = {stations.length}

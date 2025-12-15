@@ -1,5 +1,11 @@
 // src/components/MapComponent.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   MapContainer,
   TileLayer,
@@ -7,24 +13,24 @@ import {
   Popup,
   ScaleControl,
   useMap,
+  useMapEvents,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L, { latLngBounds } from "leaflet";
 
 import { stationStatusLabels, type StationStatus } from "../data/stations";
-
-export type MapStation = {
-  id: number;
-  name: string;
-  coordinates: [number, number];
-  district: string;
-  capacity: number;
-  bikesAvailable: number;
-  lastUpdated: string;
-  status: StationStatus;
-};
+import { createSpatialIndex, findNearestStation } from "../utils/spatialIndex";
+import type { MapStation } from "../types/map";
+export type { MapStation } from "../types/map";
 
 type MapComponentProps = {
+  stations: MapStation[];
+};
+
+type Cluster = {
+  id: string;
+  coordinates: [number, number];
+  count: number;
   stations: MapStation[];
 };
 
@@ -72,6 +78,25 @@ const initialFilters: Record<StationStatus, boolean> = {
   wartung: false,
 };
 
+const CLUSTER_ZOOM_THRESHOLD = 13;
+
+const haversineDistanceKm = (a: [number, number], b: [number, number]) => {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const R = 6371; // Earth radius in km
+  const dLat = toRad(b[0] - a[0]);
+  const dLng = toRad(b[1] - a[1]);
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  return R * c;
+};
+
 function MapReadyHandler({ onReady }: { onReady: (map: L.Map) => void }) {
   const map = useMap();
 
@@ -82,10 +107,27 @@ function MapReadyHandler({ onReady }: { onReady: (map: L.Map) => void }) {
   return null;
 }
 
+function MapClickHandler({
+  onClick,
+}: {
+  onClick: (coords: [number, number]) => void;
+}) {
+  useMapEvents({
+    click: (event) => onClick([event.latlng.lat, event.latlng.lng]),
+  });
+
+  return null;
+}
+
 const MapComponent: React.FC<MapComponentProps> = ({ stations }) => {
   const [currentStyle, setCurrentStyle] = useState<TileKey>("light");
   const [activeFilters, setActiveFilters] = useState(initialFilters);
   const mapRef = useRef<L.Map | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(13);
+  const [nearestStation, setNearestStation] = useState<
+    { station: MapStation; distanceKm: number } | null
+  >(null);
 
   console.log("🗺️ MapComponent received stations:", stations);
 
@@ -93,6 +135,51 @@ const MapComponent: React.FC<MapComponentProps> = ({ stations }) => {
     () => stations.filter((station) => activeFilters[station.status]),
     [stations, activeFilters],
   );
+
+  const spatialIndex = useMemo(
+    () => createSpatialIndex(filteredStations),
+    [filteredStations],
+  );
+
+  const clusterBuckets = useMemo(() => {
+    if (zoomLevel >= CLUSTER_ZOOM_THRESHOLD) return [];
+
+    const bucketSize = Math.max(0.01, 0.6 / Math.pow(2, zoomLevel));
+    const buckets = new Map<
+      string,
+      { sumLat: number; sumLng: number; count: number; stations: MapStation[] }
+    >();
+
+    filteredStations.forEach((station) => {
+      const [lat, lng] = station.coordinates;
+      const bucketLat = Math.floor(lat / bucketSize);
+      const bucketLng = Math.floor(lng / bucketSize);
+      const key = `${bucketLat}-${bucketLng}`;
+
+      const existing = buckets.get(key);
+      if (existing) {
+        existing.sumLat += lat;
+        existing.sumLng += lng;
+        existing.count += 1;
+        existing.stations.push(station);
+        return;
+      }
+
+      buckets.set(key, {
+        sumLat: lat,
+        sumLng: lng,
+        count: 1,
+        stations: [station],
+      });
+    });
+
+    return Array.from(buckets.entries()).map<Cluster>(([key, value]) => ({
+      id: key,
+      coordinates: [value.sumLat / value.count, value.sumLng / value.count],
+      count: value.count,
+      stations: value.stations,
+    }));
+  }, [filteredStations, zoomLevel]);
 
   const summary = useMemo(() => {
     const totals = filteredStations.reduce(
@@ -133,6 +220,23 @@ const MapComponent: React.FC<MapComponentProps> = ({ stations }) => {
     }));
   };
 
+  const handleNearestLookup = useCallback(
+    (coords: [number, number]) => {
+      const nearest = findNearestStation(spatialIndex, coords);
+      if (!nearest) return;
+
+      const distanceKm = haversineDistanceKm(nearest.station.coordinates, coords);
+      setNearestStation({ station: nearest.station, distanceKm });
+    },
+    [spatialIndex],
+  );
+
+  const handleClusterZoom = (cluster: Cluster) => {
+    if (!mapRef.current) return;
+    const nextZoom = Math.min(mapRef.current.getZoom() + 2, 18);
+    mapRef.current.setView(cluster.coordinates, nextZoom);
+  };
+
   const activeLayer = tileLayers[currentStyle];
   const defaultCenter =
     filteredStations[0]?.coordinates ?? [49.992863, 8.247263];
@@ -164,6 +268,20 @@ const MapComponent: React.FC<MapComponentProps> = ({ stations }) => {
     );
     mapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
   }, [filteredStations]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    const map = mapRef.current;
+    if (!map) return;
+
+    const updateZoom = () => setZoomLevel(map.getZoom());
+    map.on("zoomend", updateZoom);
+    updateZoom();
+
+    return () => {
+      map.off("zoomend", updateZoom);
+    };
+  }, [mapReady]);
 
   const handleFitToBounds = () => {
     if (!mapRef.current || filteredStations.length === 0) return;
@@ -245,53 +363,106 @@ const MapComponent: React.FC<MapComponentProps> = ({ stations }) => {
             onReady={(mapInstance) => {
               mapRef.current = mapInstance;
               mapInstance.invalidateSize();
+              setMapReady(true);
+              setZoomLevel(mapInstance.getZoom());
             }}
           />
+          <MapClickHandler onClick={handleNearestLookup} />
           <TileLayer
             url={activeLayer.url}
             attribution={activeLayer.attribution}
           />
 
-          {filteredStations.map((station) => {
-            const utilization = Math.round(
-              (station.bikesAvailable / station.capacity) * 100,
-            );
+          {zoomLevel < CLUSTER_ZOOM_THRESHOLD
+            ? clusterBuckets.map((cluster) => (
+                <CircleMarker
+                  key={cluster.id}
+                  center={cluster.coordinates}
+                  radius={Math.min(22, 12 + cluster.count)}
+                  pathOptions={{
+                    color: "#2563eb",
+                    fillColor: "#3b82f6",
+                    fillOpacity: 0.8,
+                    weight: 2,
+                  }}
+                  eventHandlers={{
+                    click: () => handleClusterZoom(cluster),
+                  }}
+                >
+                  <Popup>
+                    <div className="space-y-1">
+                      <p className="font-semibold">{cluster.count} Stationen</p>
+                      <p className="text-sm text-gray-700">
+                        Tippe für Detailansicht, um näher heranzuzoomen.
+                      </p>
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              ))
+            : filteredStations.map((station) => {
+                const utilization = Math.round(
+                  (station.bikesAvailable / station.capacity) * 100,
+                );
 
-            return (
-              <CircleMarker
-                key={station.id}
-                center={station.coordinates}
-                radius={12}
-                pathOptions={{
-                  color: statusColors[station.status],
-                  fillColor: statusColors[station.status],
-                  fillOpacity: 0.85,
-                  weight: 2,
-                }}
-              >
-                <Popup>
-                  <div className="space-y-1">
-                    <p className="font-semibold">{station.name}</p>
-                    <p className="text-sm text-gray-700">
-                      Bezirk: {station.district}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      Kapazität: {station.bikesAvailable}/{station.capacity} Bikes
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      Auslastung: {utilization}%
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Status: {stationStatusLabels[station.status]}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Aktualisiert: {station.lastUpdated}
-                    </p>
-                  </div>
-                </Popup>
-              </CircleMarker>
-            );
-          })}
+                return (
+                  <CircleMarker
+                    key={station.id}
+                    center={station.coordinates}
+                    radius={12}
+                    pathOptions={{
+                      color: statusColors[station.status],
+                      fillColor: statusColors[station.status],
+                      fillOpacity: 0.85,
+                      weight: 2,
+                    }}
+                  >
+                    <Popup>
+                      <div className="space-y-1">
+                        <p className="font-semibold">{station.name}</p>
+                        <p className="text-sm text-gray-700">
+                          Bezirk: {station.district}
+                        </p>
+                        <p className="text-sm text-gray-700">
+                          Kapazität: {station.bikesAvailable}/{station.capacity} Bikes
+                        </p>
+                        <p className="text-sm text-gray-700">
+                          Auslastung: {utilization}%
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Status: {stationStatusLabels[station.status]}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Aktualisiert: {station.lastUpdated}
+                        </p>
+                      </div>
+                    </Popup>
+                  </CircleMarker>
+                );
+              })}
+
+          {nearestStation ? (
+            <CircleMarker
+              center={nearestStation.station.coordinates}
+              radius={16}
+              pathOptions={{
+                color: "#0ea5e9",
+                fillColor: "#38bdf8",
+                fillOpacity: 0.2,
+                weight: 3,
+              }}
+            >
+              <Popup>
+                <div className="space-y-1">
+                  <p className="font-semibold">
+                    Nächstgelegene Station: {nearestStation.station.name}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    Entfernung: {nearestStation.distanceKm.toFixed(2)} km
+                  </p>
+                </div>
+              </Popup>
+            </CircleMarker>
+          ) : null}
 
           <ScaleControl position="bottomleft" />
         </MapContainer>
