@@ -39,3 +39,10 @@ def root():
         "status": "ok",
         "message": "Mikromobilität API läuft. Siehe /docs für verfügbare Endpunkte.",
     }
+
+
+@app.get("/.well-known/appspecific/com.chrome.devtools.json", include_in_schema=False)
+def chrome_devtools_placeholder():
+    """Return a minimal response to avoid noisy 404s from Chrome DevTools probes."""
+
+    return {"status": "ok"}
