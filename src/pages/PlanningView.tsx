@@ -38,6 +38,7 @@ type ScoreBreakdown = {
   weightedDemand: number;
   distanceBonus: number;
   coveragePenalty: number;
+  missingFields: string[];
 };
 
 function calculateScore(
@@ -46,20 +47,45 @@ function calculateScore(
 ): ScoreBreakdown | null {
   if (!ctx || !nb) return null;
 
+  const missingFields: string[] = [];
+
+  const schools = ctx.schools ?? 0;
+  if (ctx.schools == null) missingFields.push("context.schools");
+
+  const universities = ctx.universities ?? 0;
+  if (ctx.universities == null) missingFields.push("context.universities");
+
+  const shops = ctx.shops ?? 0;
+  if (ctx.shops == null) missingFields.push("context.shops");
+
+  const busStops = ctx.bus_stops ?? 0;
+  if (ctx.bus_stops == null) missingFields.push("context.bus_stops");
+
+  const rail = ctx.railway_stations ?? 0;
+  if (ctx.railway_stations == null) missingFields.push("context.railway_stations");
+
   const weightedDemand =
-    ctx.schools * 2 +
-    ctx.universities * 3 +
-    ctx.shops * 0.5 +
-    ctx.bus_stops * 0.5 +
-    ctx.railway_stations * 1.5;
+    schools * 2 +
+    universities * 3 +
+    shops * 0.5 +
+    busStops * 0.5 +
+    rail * 1.5;
 
   const distanceMeters = nb.nearest_station_distance_m ?? 0;
+  if (nb.nearest_station_distance_m == null)
+    missingFields.push("nearby.nearest_station_distance_m");
+
   const distanceBonus = Math.min(20, Math.round(distanceMeters / 100));
-  const coveragePenalty = Math.min(30, nb.stations_in_radius * 3);
 
-  const total = Math.max(0, Math.round(weightedDemand + distanceBonus - coveragePenalty));
+  const stationsInRadius = nb.stations_in_radius ?? 0;
+  if (nb.stations_in_radius == null) missingFields.push("nearby.stations_in_radius");
 
-  return { total, weightedDemand, distanceBonus, coveragePenalty };
+  const coveragePenalty = Math.min(30, stationsInRadius * 3);
+
+  const rawTotal = weightedDemand + distanceBonus - coveragePenalty;
+  const total = Number.isFinite(rawTotal) ? Math.max(0, Math.round(rawTotal)) : 0;
+
+  return { total, weightedDemand, distanceBonus, coveragePenalty, missingFields };
 }
 
 export default function PlanningView() {
@@ -250,6 +276,32 @@ export default function PlanningView() {
                   </div>
                 </li>
               </ul>
+              {score.missingFields.length > 0 && (
+                <div
+                  style={{
+                    background: "#fff5e6",
+                    border: "1px solid #ffd9a0",
+                    borderRadius: 6,
+                    padding: 8,
+                    marginTop: 10,
+                    fontSize: 12,
+                    color: "#8a5a00",
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>Welche Werte fehlten?</div>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {score.missingFields.map((field) => (
+                      <li key={field}>{field}</li>
+                    ))}
+                  </ul>
+                  <div style={{ marginTop: 6 }}>
+                    Fehlende Felder werden mit 0 verrechnet, damit keine NaN-Werte
+                    entstehen. Das wirkt neutral auf den Score: Ein fehlendes Feld
+                    trägt weder Plus- noch Minuspunkte bei, solange die API keinen
+                    Wert liefert.
+                  </div>
+                </div>
+              )}
               <p style={{ color: "#444", fontSize: 12, marginTop: 10 }}>
                 Der Score fasst Nachfrage (Schulen/Unis/POIs), Abstand zur nächsten
                 Station und bestehende Abdeckung zusammen. Höher = besserer Kandidat
