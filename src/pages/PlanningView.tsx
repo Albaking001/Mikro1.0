@@ -34,10 +34,12 @@ function ClickHandler({ onClick }: { onClick: (lat: number, lng: number) => void
 }
 
 type ScoreBreakdown = {
-  total: number;
+  normalizedTotal: number;
+  rawTotal: number;
   weightedDemand: number;
   distanceBonus: number;
   coveragePenalty: number;
+  label: string;
   missingFields: string[];
 };
 
@@ -83,9 +85,30 @@ function calculateScore(
   const coveragePenalty = Math.min(30, stationsInRadius * 3);
 
   const rawTotal = weightedDemand + distanceBonus - coveragePenalty;
-  const total = Number.isFinite(rawTotal) ? Math.max(0, Math.round(rawTotal)) : 0;
 
-  return { total, weightedDemand, distanceBonus, coveragePenalty, missingFields };
+  const normalized =
+    Number.isFinite(rawTotal) && rawTotal > 0
+      ? Math.max(0, Math.min(100, Math.round((rawTotal / (rawTotal + 60)) * 100)))
+      : 0;
+
+  const label =
+    normalized >= 90
+      ? "Sehr gut"
+      : normalized >= 70
+        ? "Gut"
+        : normalized >= 50
+          ? "Eher okay"
+          : "Eher schlecht";
+
+  return {
+    normalizedTotal: normalized,
+    rawTotal,
+    weightedDemand,
+    distanceBonus,
+    coveragePenalty,
+    label,
+    missingFields,
+  };
 }
 
 export default function PlanningView() {
@@ -250,10 +273,28 @@ export default function PlanningView() {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
                 }}
               >
-                <span style={{ fontSize: 14, color: "#2c3e50" }}>Gesamtscore</span>
-                <strong style={{ fontSize: 22, color: "#1f6feb" }}>{score.total}</strong>
+                <div>
+                  <div style={{ fontSize: 14, color: "#2c3e50" }}>Gesamtscore</div>
+                  <strong style={{ fontSize: 22, color: "#1f6feb" }}>
+                    {score.normalizedTotal} / 100
+                  </strong>
+                </div>
+                <span
+                  style={{
+                    background: "#e8f4ff",
+                    color: "#0a4a9a",
+                    padding: "4px 10px",
+                    borderRadius: 999,
+                    fontWeight: 700,
+                    fontSize: 13,
+                  }}
+                >
+                  {score.label}
+                </span>
               </div>
 
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
@@ -273,6 +314,13 @@ export default function PlanningView() {
                   Abdeckungs-Penalty: <b>-{score.coveragePenalty}</b>
                   <div style={{ color: "#666", fontSize: 12 }}>
                     Wird höher, je mehr Stationen im Radius liegen
+                  </div>
+                </li>
+                <li>
+                  Rohwert vor Normalisierung: <b>{Math.max(0, Math.round(score.rawTotal))}</b>
+                  <div style={{ color: "#666", fontSize: 12 }}>
+                    In einen 0-100-Score skaliert: Score = raw / (raw + 60) × 100,
+                    gedeckelt zwischen 0 und 100.
                   </div>
                 </li>
               </ul>
@@ -304,8 +352,9 @@ export default function PlanningView() {
               )}
               <p style={{ color: "#444", fontSize: 12, marginTop: 10 }}>
                 Der Score fasst Nachfrage (Schulen/Unis/POIs), Abstand zur nächsten
-                Station und bestehende Abdeckung zusammen. Höher = besserer Kandidat
-                für einen neuen Standort.
+                Station und bestehende Abdeckung zusammen. Der Score wird auf 0-100
+                skaliert; Labels helfen bei der schnellen Einordnung (100 = sehr gut,
+                unter 50 eher schlecht).
               </p>
             </>
           ) : (
