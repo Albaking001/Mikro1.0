@@ -33,6 +33,35 @@ function ClickHandler({ onClick }: { onClick: (lat: number, lng: number) => void
   return null;
 }
 
+type ScoreBreakdown = {
+  total: number;
+  weightedDemand: number;
+  distanceBonus: number;
+  coveragePenalty: number;
+};
+
+function calculateScore(
+  ctx: PlanningContextResponse | null,
+  nb: NearbyStationsResponse | null,
+): ScoreBreakdown | null {
+  if (!ctx || !nb) return null;
+
+  const weightedDemand =
+    ctx.schools * 2 +
+    ctx.universities * 3 +
+    ctx.shops * 0.5 +
+    ctx.bus_stops * 0.5 +
+    ctx.railway_stations * 1.5;
+
+  const distanceMeters = nb.nearest_station_distance_m ?? 0;
+  const distanceBonus = Math.min(20, Math.round(distanceMeters / 100));
+  const coveragePenalty = Math.min(30, nb.stations_in_radius * 3);
+
+  const total = Math.max(0, Math.round(weightedDemand + distanceBonus - coveragePenalty));
+
+  return { total, weightedDemand, distanceBonus, coveragePenalty };
+}
+
 export default function PlanningView() {
   const [point, setPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [radius, setRadius] = useState<number>(500);
@@ -43,6 +72,8 @@ export default function PlanningView() {
 
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const score = calculateScore(context, nearby);
 
   async function handleClick(lat: number, lng: number) {
     setPoint({ lat, lng });
@@ -175,6 +206,60 @@ export default function PlanningView() {
             </ul>
           ) : (
             <div style={{ color: "#666", fontSize: 13 }}>(keine Daten)</div>
+          )}
+        </div>
+
+        {/* Scoreboard */}
+        <div style={{ borderTop: "1px solid #eee", paddingTop: 10, marginTop: 10 }}>
+          <h3 style={{ margin: "8px 0" }}>Scoreboard (Potenzial)</h3>
+          {score ? (
+            <>
+              <div
+                style={{
+                  padding: 10,
+                  borderRadius: 8,
+                  background: "#f2f7ff",
+                  border: "1px solid #d6e5ff",
+                  marginBottom: 10,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <span style={{ fontSize: 14, color: "#2c3e50" }}>Gesamtscore</span>
+                <strong style={{ fontSize: 22, color: "#1f6feb" }}>{score.total}</strong>
+              </div>
+
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+                <li>
+                  Nachfrage (gewichtet): <b>{score.weightedDemand.toFixed(1)}</b>
+                  <div style={{ color: "#666", fontSize: 12 }}>
+                    Schulen ×2, Unis ×3, Shops ×0.5, Bus ×0.5, Bahn ×1.5
+                  </div>
+                </li>
+                <li>
+                  Distanzbonus: <b>{score.distanceBonus}</b>
+                  <div style={{ color: "#666", fontSize: 12 }}>
+                    Mehr Punkte, je weiter die nächste Station entfernt ist
+                  </div>
+                </li>
+                <li>
+                  Abdeckungs-Penalty: <b>-{score.coveragePenalty}</b>
+                  <div style={{ color: "#666", fontSize: 12 }}>
+                    Wird höher, je mehr Stationen im Radius liegen
+                  </div>
+                </li>
+              </ul>
+              <p style={{ color: "#444", fontSize: 12, marginTop: 10 }}>
+                Der Score fasst Nachfrage (Schulen/Unis/POIs), Abstand zur nächsten
+                Station und bestehende Abdeckung zusammen. Höher = besserer Kandidat
+                für einen neuen Standort.
+              </p>
+            </>
+          ) : (
+            <div style={{ color: "#666", fontSize: 13 }}>
+              Score wird berechnet, sobald ein Punkt auf der Karte gewählt wurde.
+            </div>
           )}
         </div>
       </div>
