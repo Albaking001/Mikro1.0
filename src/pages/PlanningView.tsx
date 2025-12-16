@@ -33,6 +33,61 @@ function ClickHandler({ onClick }: { onClick: (lat: number, lng: number) => void
   return null;
 }
 
+type ScoreBreakdown = {
+  total: number;
+  weightedDemand: number;
+  distanceBonus: number;
+  coveragePenalty: number;
+  missingFields: string[];
+};
+
+function calculateScore(
+  ctx: PlanningContextResponse | null,
+  nb: NearbyStationsResponse | null,
+): ScoreBreakdown | null {
+  if (!ctx || !nb) return null;
+
+  const missingFields: string[] = [];
+
+  const schools = ctx.schools ?? 0;
+  if (ctx.schools == null) missingFields.push("context.schools");
+
+  const universities = ctx.universities ?? 0;
+  if (ctx.universities == null) missingFields.push("context.universities");
+
+  const shops = ctx.shops ?? 0;
+  if (ctx.shops == null) missingFields.push("context.shops");
+
+  const busStops = ctx.bus_stops ?? 0;
+  if (ctx.bus_stops == null) missingFields.push("context.bus_stops");
+
+  const rail = ctx.railway_stations ?? 0;
+  if (ctx.railway_stations == null) missingFields.push("context.railway_stations");
+
+  const weightedDemand =
+    schools * 2 +
+    universities * 3 +
+    shops * 0.5 +
+    busStops * 0.5 +
+    rail * 1.5;
+
+  const distanceMeters = nb.nearest_station_distance_m ?? 0;
+  if (nb.nearest_station_distance_m == null)
+    missingFields.push("nearby.nearest_station_distance_m");
+
+  const distanceBonus = Math.min(20, Math.round(distanceMeters / 100));
+
+  const stationsInRadius = nb.stations_in_radius ?? 0;
+  if (nb.stations_in_radius == null) missingFields.push("nearby.stations_in_radius");
+
+  const coveragePenalty = Math.min(30, stationsInRadius * 3);
+
+  const rawTotal = weightedDemand + distanceBonus - coveragePenalty;
+  const total = Number.isFinite(rawTotal) ? Math.max(0, Math.round(rawTotal)) : 0;
+
+  return { total, weightedDemand, distanceBonus, coveragePenalty, missingFields };
+}
+
 export default function PlanningView() {
   const [point, setPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [radius, setRadius] = useState<number>(500);
@@ -43,6 +98,8 @@ export default function PlanningView() {
 
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const score = calculateScore(context, nearby);
 
   async function handleClick(lat: number, lng: number) {
     setPoint({ lat, lng });
@@ -175,6 +232,86 @@ export default function PlanningView() {
             </ul>
           ) : (
             <div style={{ color: "#666", fontSize: 13 }}>(keine Daten)</div>
+          )}
+        </div>
+
+        {/* Scoreboard */}
+        <div style={{ borderTop: "1px solid #eee", paddingTop: 10, marginTop: 10 }}>
+          <h3 style={{ margin: "8px 0" }}>Scoreboard (Potenzial)</h3>
+          {score ? (
+            <>
+              <div
+                style={{
+                  padding: 10,
+                  borderRadius: 8,
+                  background: "#f2f7ff",
+                  border: "1px solid #d6e5ff",
+                  marginBottom: 10,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <span style={{ fontSize: 14, color: "#2c3e50" }}>Gesamtscore</span>
+                <strong style={{ fontSize: 22, color: "#1f6feb" }}>{score.total}</strong>
+              </div>
+
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+                <li>
+                  Nachfrage (gewichtet): <b>{score.weightedDemand.toFixed(1)}</b>
+                  <div style={{ color: "#666", fontSize: 12 }}>
+                    Schulen ×2, Unis ×3, Shops ×0.5, Bus ×0.5, Bahn ×1.5
+                  </div>
+                </li>
+                <li>
+                  Distanzbonus: <b>{score.distanceBonus}</b>
+                  <div style={{ color: "#666", fontSize: 12 }}>
+                    Mehr Punkte, je weiter die nächste Station entfernt ist
+                  </div>
+                </li>
+                <li>
+                  Abdeckungs-Penalty: <b>-{score.coveragePenalty}</b>
+                  <div style={{ color: "#666", fontSize: 12 }}>
+                    Wird höher, je mehr Stationen im Radius liegen
+                  </div>
+                </li>
+              </ul>
+              {score.missingFields.length > 0 && (
+                <div
+                  style={{
+                    background: "#fff5e6",
+                    border: "1px solid #ffd9a0",
+                    borderRadius: 6,
+                    padding: 8,
+                    marginTop: 10,
+                    fontSize: 12,
+                    color: "#8a5a00",
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>Welche Werte fehlten?</div>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {score.missingFields.map((field) => (
+                      <li key={field}>{field}</li>
+                    ))}
+                  </ul>
+                  <div style={{ marginTop: 6 }}>
+                    Fehlende Felder werden mit 0 verrechnet, damit keine NaN-Werte
+                    entstehen. Das wirkt neutral auf den Score: Ein fehlendes Feld
+                    trägt weder Plus- noch Minuspunkte bei, solange die API keinen
+                    Wert liefert.
+                  </div>
+                </div>
+              )}
+              <p style={{ color: "#444", fontSize: 12, marginTop: 10 }}>
+                Der Score fasst Nachfrage (Schulen/Unis/POIs), Abstand zur nächsten
+                Station und bestehende Abdeckung zusammen. Höher = besserer Kandidat
+                für einen neuen Standort.
+              </p>
+            </>
+          ) : (
+            <div style={{ color: "#666", fontSize: 13 }}>
+              Score wird berechnet, sobald ein Punkt auf der Karte gewählt wurde.
+            </div>
           )}
         </div>
       </div>
