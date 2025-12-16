@@ -11,6 +11,7 @@ from routers.providers import router as providers_router
 from routers.planning import router as planning_router
 
 
+
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
 app.include_router(cities_router)
