@@ -14,6 +14,17 @@ import type {
   NearbyStationsResponse,
 } from "../api/planning";
 
+const theme = {
+  colors: {
+    textPrimary: "#1f2937",   // fast schwarz -> Haupttext
+    textSecondary: "#374151", // dunkles Grau -> normaler Text
+    textMuted: "#6b7280",     // echtes Grau -> Hinweise
+    accent: "#1f6feb",        // Blau (Score, Highlights)
+    background: "#f5f7fa",    // Sidebar-Hintergrund
+    cardBackground: "#ffffff",
+  },
+};
+
 // Small helper: no `any`
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -42,6 +53,48 @@ type ScoreBreakdown = {
   label: string;
   missingFields: string[];
 };
+
+function Card({
+                title,
+                children,
+              }: {
+  title?: string;
+  children: React.ReactNode;
+}) {
+  return (
+      <div
+          style={{
+            background: theme.colors.cardBackground,
+            borderRadius: 14,
+            padding: 16,
+            marginBottom: 16,
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
+          }}
+      >
+        {title && (
+            <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: theme.colors.textPrimary,
+                  marginBottom: 12,
+                }}
+            >
+              {title}
+            </div>
+        )}
+        {children}
+      </div>
+  );
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+      <label style={{ display: "block", fontSize: 12, color: "#444", marginBottom: 6 }}>
+        {children}
+      </label>
+  );
+}
 
 function calculateScore(
   ctx: PlanningContextResponse | null,
@@ -111,6 +164,13 @@ function calculateScore(
   };
 }
 
+/* Funktion provisorisch für Größe der Fahrradstation basierend auf Score*/
+function getStationRecommendation(score: number) {
+  if (score >= 80) return "Große Station (20+ Räder)";
+  if (score >= 60) return "Mittlere Station (10–12 Räder)";
+  return "Kleine Station (6–8 Räder)";
+}
+
 export default function PlanningView() {
   const [point, setPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [radius, setRadius] = useState<number>(500);
@@ -146,6 +206,14 @@ export default function PlanningView() {
     }
   }
 
+  //Dummy Daten für Häufigkeit der Nutzung einer Station
+  const demoUsage = {
+    avgUtilization: 78,
+    turnoverPerDay: 4.6,
+    fullEventsPerDay: 2,
+    emptyEventsPerDay: 1,
+  };
+
   return (
     <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
       {/* MAP */}
@@ -177,193 +245,243 @@ export default function PlanningView() {
 
       {/* SIDEBAR */}
       <div
-        style={{
-          width: 400,
-          padding: 16,
-          borderLeft: "1px solid #ddd",
-          overflowY: "auto",
-          background: "white",
-        }}
+          style={{
+            width: 420,
+            padding: 16,
+            borderLeft: "1px solid #ddd",
+            overflowY: "auto",
+            background: theme.colors.background,
+            color: theme.colors.textSecondary, // 👈 WICHTIG
+          }}
       >
-        <h2 style={{ marginTop: 0 }}>Planung</h2>
 
-        <label style={{ display: "block", fontSize: 12, color: "#444" }}>City</label>
-        <input
-          value={cityName}
-          onChange={(e) => setCityName(e.target.value)}
-          style={{ width: "100%", marginBottom: 12 }}
-          placeholder="Mainz"
-        />
-
-        <label style={{ display: "block", fontSize: 12, color: "#444" }}>Radius (m)</label>
-        <input
-          type="number"
-          value={radius}
-          min={50}
-          max={5000}
-          onChange={(e) => setRadius(Number(e.target.value))}
-          style={{ width: "100%", marginBottom: 10 }}
-        />
-
-        <p style={{ fontSize: 12, color: "#666" }}>
-          Tipp: Klick auf die Karte ⇒ simulierte Station + Context/Network Daten.
-        </p>
-
-        {point && (
-          <div style={{ fontFamily: "monospace", fontSize: 13, marginBottom: 12 }}>
-            lat: {point.lat.toFixed(6)} <br />
-            lng: {point.lng.toFixed(6)}
+        <div style={{ marginBottom: 12 }}>
+          <h2 style={{ margin: 0 , color: "#1f2937" }}>Planung</h2>
+          <div style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 4 }}>
+            Standort wählen → Kontext/Netz laden → Score bewerten
           </div>
-        )}
-
-        {loading && (
-          <div style={{ padding: 10, background: "#f6f6f6", borderRadius: 10 }}>
-            Lädt Daten…
-          </div>
-        )}
-
-        {error && (
-          <div style={{ padding: 10, background: "#ffecec", borderRadius: 10, color: "#8a0000" }}>
-            <b>Fehler:</b> {error}
-          </div>
-        )}
-
-        {/* Nearby stations */}
-        <div style={{ borderTop: "1px solid #eee", paddingTop: 10, marginTop: 10 }}>
-          <h3 style={{ margin: "8px 0" }}>Netzabdeckung (Stations)</h3>
-          {nearby ? (
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              <li>Stations im Radius: <b>{nearby.stations_in_radius}</b></li>
-              <li>Nearest: <b>{nearby.nearest_station?.name ?? "-"}</b></li>
-              <li>Distanz: <b>{nearby.nearest_station_distance_m ?? "-"} m</b></li>
-            </ul>
-          ) : (
-            <div style={{ color: "#666", fontSize: 13 }}>(keine Daten)</div>
-          )}
         </div>
 
-        {/* Context */}
-        <div style={{ borderTop: "1px solid #eee", paddingTop: 10, marginTop: 10 }}>
-          <h3 style={{ margin: "8px 0" }}>Kontext (OSM / Overpass)</h3>
-          {context ? (
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              <li>Bus stops: <b>{context.bus_stops}</b></li>
-              <li>Rail stations: <b>{context.railway_stations}</b></li>
-              <li>Schools: <b>{context.schools}</b></li>
-              <li>Universities: <b>{context.universities}</b></li>
-              <li>Shops (POI): <b>{context.shops}</b></li>
-            </ul>
-          ) : (
-            <div style={{ color: "#666", fontSize: 13 }}>(keine Daten)</div>
-          )}
-        </div>
+        <Card title="Eingaben">
+          <FieldLabel>City</FieldLabel>
+          <input
+              value={cityName}
+              onChange={(e) => setCityName(e.target.value)}
+              style={{ width: "60%", marginBottom: 12, padding: 8, borderRadius: 8, border: "1px solid #ddd" }}
+              placeholder="Mainz"
+          />
 
-        {/* Scoreboard */}
-        <div style={{ borderTop: "1px solid #eee", paddingTop: 10, marginTop: 10 }}>
-          <h3 style={{ margin: "8px 0" }}>Scoreboard (Potenzial)</h3>
+          <FieldLabel>Radius (m)</FieldLabel>
+          <input
+              type="number"
+              value={radius}
+              min={50}
+              max={5000}
+              onChange={(e) => setRadius(Number(e.target.value))}
+              style={{ width: "60%", padding: 8, borderRadius: 8, border: "1px solid #ddd" }}
+          />
+
+          <div style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 10 }}>
+            Tipp: Klick auf die Karte ⇒ simulierte Station + Context/Network Daten.
+          </div>
+        </Card>
+
+        <Card title="Score (Potenzial)">
           {score ? (
-            <>
-              <div
-                style={{
-                  padding: 10,
-                  borderRadius: 8,
-                  background: "#f2f7ff",
-                  border: "1px solid #d6e5ff",
-                  marginBottom: 10,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 8,
-                  flexWrap: "wrap",
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 14, color: "#2c3e50" }}>Gesamtscore</div>
-                  <strong style={{ fontSize: 22, color: "#1f6feb" }}>
-                    {score.normalizedTotal} / 100
-                  </strong>
-                </div>
-                <span
-                  style={{
-                    background: "#e8f4ff",
-                    color: "#0a4a9a",
-                    padding: "4px 10px",
-                    borderRadius: 999,
-                    fontWeight: 700,
-                    fontSize: 13,
-                  }}
-                >
-                  {score.label}
-                </span>
-              </div>
-
-              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
-                <li>
-                  Nachfrage (gewichtet): <b>{score.weightedDemand.toFixed(1)}</b>
-                  <div style={{ color: "#666", fontSize: 12 }}>
-                    Schulen ×2, Unis ×3, Shops ×0.5, Bus ×0.5, Bahn ×1.5
-                  </div>
-                </li>
-                <li>
-                  Distanzbonus: <b>{score.distanceBonus}</b>
-                  <div style={{ color: "#666", fontSize: 12 }}>
-                    Mehr Punkte, je weiter die nächste Station entfernt ist
-                  </div>
-                </li>
-                <li>
-                  Abdeckungs-Penalty: <b>-{score.coveragePenalty}</b>
-                  <div style={{ color: "#666", fontSize: 12 }}>
-                    Wird höher, je mehr Stationen im Radius liegen
-                  </div>
-                </li>
-                <li>
-                  Rohwert vor Normalisierung: <b>{Math.max(0, Math.round(score.rawTotal))}</b>
-                  <div style={{ color: "#666", fontSize: 12 }}>
-                    In einen 0-100-Score skaliert: Score = raw / (raw + 60) × 100,
-                    gedeckelt zwischen 0 und 100.
-                  </div>
-                </li>
-              </ul>
-              {score.missingFields.length > 0 && (
+              <>
                 <div
-                  style={{
-                    background: "#fff5e6",
-                    border: "1px solid #ffd9a0",
-                    borderRadius: 6,
-                    padding: 8,
-                    marginTop: 10,
-                    fontSize: 12,
-                    color: "#8a5a00",
-                  }}
+                    style={{
+                      padding: 12,
+                      borderRadius: 12,
+                      background: "#f2f7ff",
+                      border: "1px solid #d6e5ff",
+                      marginBottom: 10,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
                 >
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>Welche Werte fehlten?</div>
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {score.missingFields.map((field) => (
-                      <li key={field}>{field}</li>
-                    ))}
-                  </ul>
-                  <div style={{ marginTop: 6 }}>
-                    Fehlende Felder werden mit 0 verrechnet, damit keine NaN-Werte
-                    entstehen. Das wirkt neutral auf den Score: Ein fehlendes Feld
-                    trägt weder Plus- noch Minuspunkte bei, solange die API keinen
-                    Wert liefert.
+                  <div>
+                    <div style={{ fontSize: 13, color: "#2c3e50" }}>Gesamtscore</div>
+                    <strong style={{ fontSize: 24, color: "#1f6feb" }}>
+                      {score.normalizedTotal} / 100
+                    </strong>
                   </div>
+                  <span
+                      style={{
+                        background: "#e8f4ff",
+                        color: "#0a4a9a",
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        fontWeight: 700,
+                        fontSize: 13,
+                      }}
+                  >
+            {score.label}
+          </span>
                 </div>
-              )}
-              <p style={{ color: "#444", fontSize: 12, marginTop: 10 }}>
-                Der Score fasst Nachfrage (Schulen/Unis/POIs), Abstand zur nächsten
-                Station und bestehende Abdeckung zusammen. Der Score wird auf 0-100
-                skaliert; Labels helfen bei der schnellen Einordnung (100 = sehr gut,
-                unter 50 eher schlecht).
-              </p>
-            </>
+
+                <div style={{ fontSize: 12, color: theme.colors.textMuted }}>
+                  Vorschau der Berechnung (Details kommen gleich unten in den Blöcken).
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+                  <li>
+                    Nachfrage (gewichtet): <b>{score.weightedDemand.toFixed(1)}</b>
+                    <div style={{ color: theme.colors.textMuted, fontSize: 12 }}>
+                      Schulen ×2, Unis ×3, Shops ×0.5, Bus ×0.5, Bahn ×1.5
+                    </div>
+                  </li>
+
+                  <li>
+                    Distanzbonus: <b>{score.distanceBonus}</b>
+                    <div style={{ color: theme.colors.textMuted, fontSize: 12 }}>
+                      Mehr Punkte, je weiter die nächste Station entfernt ist
+                    </div>
+                  </li>
+
+                  <li>
+                    Abdeckungs-Penalty: <b>-{score.coveragePenalty}</b>
+                    <div style={{ color: theme.colors.textMuted, fontSize: 12 }}>
+                      Wird höher, je mehr Stationen im Radius liegen
+                    </div>
+                  </li>
+
+                  <li>
+                    Rohwert vor Normalisierung:{" "}
+                    <b>{Math.max(0, Math.round(score.rawTotal))}</b>
+                    <div style={{ color: theme.colors.textMuted, fontSize: 12 }}>
+                      In einen 0-100-Score skaliert: Score = raw / (raw + 60) × 100,
+                      gedeckelt zwischen 0 und 100.
+                    </div>
+                  </li>
+                </ul>
+
+                {score.missingFields.length > 0 && (
+                    <div
+                        style={{
+                          background: "#fff5e6",
+                          border: "1px solid #ffd9a0",
+                          borderRadius: 6,
+                          padding: 8,
+                          marginTop: 10,
+                          fontSize: 12,
+                          color: "#8a5a00",
+                        }}
+                    >
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                        Welche Werte fehlten?
+                      </div>
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        {score.missingFields.map((field) => (
+                            <li key={field}>{field}</li>
+                        ))}
+                      </ul>
+                      <div style={{ marginTop: 6 }}>
+                        Fehlende Felder werden mit 0 verrechnet, damit keine NaN-Werte
+                        entstehen. Das wirkt neutral auf den Score.
+                      </div>
+                    </div>
+                )}
+
+              </>
           ) : (
-            <div style={{ color: "#666", fontSize: 13 }}>
-              Score wird berechnet, sobald ein Punkt auf der Karte gewählt wurde.
-            </div>
+              <div style={{ color: theme.colors.textMuted, fontSize: 13 }}>
+                Score wird berechnet, sobald ein Punkt auf der Karte gewählt wurde.
+              </div>
           )}
-        </div>
+        </Card>
+
+        <Card title="Status">
+          {point ? (
+              <div style={{ fontFamily: "monospace", fontSize: 13 }}>
+                lat: {point.lat.toFixed(6)} <br />
+                lng: {point.lng.toFixed(6)}
+              </div>
+          ) : (
+              <div style={{ color: theme.colors.textMuted, fontSize: 13 }}>
+                Noch kein Punkt gewählt.
+              </div>
+          )}
+
+          {loading && (
+              <div style={{ marginTop: 10, padding: 10, background: "#f6f6f6", borderRadius: 10 }}>
+                Lädt Daten…
+              </div>
+          )}
+
+          {error && (
+              <div
+                  style={{
+                    marginTop: 10,
+                    padding: 10,
+                    background: "#ffecec",
+                    borderRadius: 10,
+                    color: "#8a0000",
+                  }}
+              >
+                <b>Fehler:</b> {error}
+              </div>
+          )}
+        </Card>
+
+        <Card title="Netzabdeckung">
+          {nearby ? (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <li>Stations im Radius: <b>{nearby.stations_in_radius}</b></li>
+                <li>Nearest: <b>{nearby.nearest_station?.name ?? "-"}</b></li>
+                <li>Distanz: <b>{nearby.nearest_station_distance_m ?? "-"} m</b></li>
+              </ul>
+          ) : (
+              <div style={{ color: theme.colors.textMuted, fontSize: 13 }}>(keine Daten)</div>
+          )}
+        </Card>
+
+        <Card title="Kontext (OSM / Overpass)">
+          {context ? (
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <li>Bus stops: <b>{context.bus_stops}</b></li>
+                <li>Rail stations: <b>{context.railway_stations}</b></li>
+                <li>Schools: <b>{context.schools}</b></li>
+                <li>Universities: <b>{context.universities}</b></li>
+                <li>Shops (POI): <b>{context.shops}</b></li>
+              </ul>
+          ) : (
+              <div style={{ color: theme.colors.textMuted, fontSize: 13 }}>(keine Daten)</div>
+          )}
+        </Card>
+
+        <Card title="Empfehlung Stationsgröße">
+          {score ? (
+              <>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>
+                  {getStationRecommendation(score.normalizedTotal)}
+                </div>
+                <div style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 6 }}>
+                  Basierend auf Score und erwarteter Nachfrage (Simulation).
+                </div>
+              </>
+          ) : (
+              <div style={{ fontSize: 13, color: theme.colors.textMuted }}>
+                Empfehlung verfügbar, sobald ein Standort bewertet wurde.
+              </div>
+          )}
+        </Card>
+
+        <Card title="Nutzungsmuster umliegender Stationen">
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            <li>Ø Auslastung: <b>{demoUsage.avgUtilization}%</b></li>
+            <li>Turnover / Tag: <b>{demoUsage.turnoverPerDay}</b></li>
+            <li>Vollstände / Tag: <b>{demoUsage.fullEventsPerDay}</b></li>
+            <li>Leerstände / Tag: <b>{demoUsage.emptyEventsPerDay}</b></li>
+          </ul>
+          <div style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 8 }}>
+            Prognose / Demo-Werte – echte Nutzungsdaten folgen.
+          </div>
+        </Card>
+
       </div>
     </div>
-  );
+);
 }
