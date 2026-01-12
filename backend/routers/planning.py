@@ -15,6 +15,7 @@ from services.overpass import (
     count_schools_universities,
     count_shops,
     count_pois,
+    fetch_poi_elements,
 )
 
 router = APIRouter(prefix="/api/v1/planning", tags=["planning"])
@@ -63,6 +64,7 @@ def planning_context(
         edu = count_schools_universities(lat, lng, radius)
         shops = count_shops(lat, lng, radius)
         pois = count_pois(lat, lng, radius)
+        poi_elements = fetch_poi_elements(lat, lng, radius)
 
     except OverpassError as e:
        
@@ -89,6 +91,7 @@ def planning_context(
 
         "pois_total": pois["total"],
         "pois": pois["breakdown"],
+        "poi_elements": poi_elements,
     }
 
 

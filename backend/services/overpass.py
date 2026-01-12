@@ -239,3 +239,50 @@ def count_pois(lat: float, lng: float, radius_m: int) -> dict:
         total += c
 
     return {"total": total, "breakdown": breakdown}
+
+
+def fetch_poi_elements(lat: float, lng: float, radius_m: int, limit: int = 200) -> list[dict]:
+    around = _around_clause(lat, lng, radius_m)
+    query = f"""
+    [out:json][timeout:25];
+    (
+      node["shop"]{around};
+      node["amenity"="school"]{around};
+      node["amenity"="university"]{around};
+      node["amenity"="college"]{around};
+    );
+    out {limit};
+    """
+    data = _post_overpass(query)
+    elements = data.get("elements", [])
+
+    results: list[dict] = []
+    for element in elements:
+        tags = element.get("tags", {})
+        category = None
+        if "shop" in tags:
+            category = "shop"
+        elif tags.get("amenity") == "school":
+            category = "school"
+        elif tags.get("amenity") in {"university", "college"}:
+            category = "university"
+
+        if category is None:
+            continue
+
+        lat_value = element.get("lat")
+        lng_value = element.get("lon")
+        if lat_value is None or lng_value is None:
+            continue
+
+        results.append(
+            {
+                "id": element.get("id"),
+                "lat": lat_value,
+                "lng": lng_value,
+                "category": category,
+                "name": tags.get("name"),
+            }
+        )
+
+    return results
