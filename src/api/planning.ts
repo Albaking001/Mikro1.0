@@ -9,6 +9,13 @@ export type PlanningContextResponse = {
   schools: number;
   universities: number;
   shops: number;
+  poi_elements?: {
+    id: number;
+    lat: number;
+    lng: number;
+    category: "shop" | "school" | "university";
+    name?: string;
+  }[];
 };
 
 export type NearbyStation = {

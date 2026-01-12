@@ -1,8 +1,9 @@
 // src/pages/PlanningView.tsx
 
-import { useState } from "react";
-import { MapContainer, TileLayer, Marker, Circle, useMapEvents } from "react-leaflet";
+import { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Marker, Circle, Popup, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import L from "leaflet";
 
 import {
   getPlanningContext,
@@ -24,6 +25,76 @@ const theme = {
     cardBackground: "#ffffff",
   },
 };
+
+const markerShadowUrl =
+  "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png";
+
+const stationIcon = L.icon({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: markerShadowUrl,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
+
+const selectedIcon = L.icon({
+  iconUrl:
+    "https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-grey.png",
+  shadowUrl: markerShadowUrl,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
+
+const savedIcon = L.icon({
+  iconUrl:
+    "https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-orange.png",
+  shadowUrl: markerShadowUrl,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
+
+const bestIcon = L.icon({
+  iconUrl:
+    "https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-green.png",
+  shadowUrl: markerShadowUrl,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
+
+const poiIconUrls = {
+  shop: "https://cdn.jsdelivr.net/gh/openstreetmap/openstreetmap-website/app/assets/images/mapicons/shop.p.16.png",
+  school:
+    "https://cdn.jsdelivr.net/gh/openstreetmap/openstreetmap-website/app/assets/images/mapicons/amenity_school.p.16.png",
+  university:
+    "https://cdn.jsdelivr.net/gh/openstreetmap/openstreetmap-website/app/assets/images/mapicons/amenity_university.p.16.png",
+} as const;
+
+const poiIcons = {
+  shop: L.icon({
+    iconUrl: poiIconUrls.shop,
+    shadowUrl: markerShadowUrl,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    popupAnchor: [0, -8],
+  }),
+  school: L.icon({
+    iconUrl: poiIconUrls.school,
+    shadowUrl: markerShadowUrl,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    popupAnchor: [0, -8],
+  }),
+  university: L.icon({
+    iconUrl: poiIconUrls.university,
+    shadowUrl: markerShadowUrl,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    popupAnchor: [0, -8],
+  }),
+} as const;
 
 // Small helper: no `any`
 function getErrorMessage(err: unknown): string {
@@ -52,6 +123,20 @@ type ScoreBreakdown = {
   coveragePenalty: number;
   label: string;
   missingFields: string[];
+};
+
+type CityStation = {
+  id: number;
+  name: string;
+  lat: number;
+  lng: number;
+};
+
+type SavedMarker = {
+  id: string;
+  lat: number;
+  lng: number;
+  createdAt: string;
 };
 
 function Card({
@@ -178,6 +263,30 @@ export default function PlanningView() {
 
   const [context, setContext] = useState<PlanningContextResponse | null>(null);
   const [nearby, setNearby] = useState<NearbyStationsResponse | null>(null);
+  const [stations, setStations] = useState<CityStation[]>([]);
+
+  const [savedMarkers, setSavedMarkers] = useState<SavedMarker[]>(() => {
+    if (typeof window === "undefined") return [];
+    const stored = window.localStorage.getItem("planning.savedMarkers");
+    if (!stored) return [];
+    try {
+      const parsed = JSON.parse(stored) as SavedMarker[];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+  const [bestMarker, setBestMarker] = useState<SavedMarker | null>(() => {
+    if (typeof window === "undefined") return null;
+    const stored = window.localStorage.getItem("planning.bestMarker");
+    if (!stored) return null;
+    try {
+      const parsed = JSON.parse(stored) as SavedMarker;
+      return parsed ?? null;
+    } catch {
+      return null;
+    }
+  });
 
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -206,6 +315,84 @@ export default function PlanningView() {
     }
   }
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("planning.savedMarkers", JSON.stringify(savedMarkers));
+  }, [savedMarkers]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (bestMarker) {
+      window.localStorage.setItem("planning.bestMarker", JSON.stringify(bestMarker));
+    } else {
+      window.localStorage.removeItem("planning.bestMarker");
+    }
+  }, [bestMarker]);
+
+  useEffect(() => {
+    if (!cityName.trim()) {
+      setStations([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadStations() {
+      try {
+        const res = await fetch(
+          `/api/v1/stations?city_name=${encodeURIComponent(cityName)}`,
+        );
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(`Stations ${res.status}: ${text || res.statusText}`);
+        }
+        const data = (await res.json()) as CityStation[];
+        if (cancelled) return;
+        const mapped = data.filter(
+          (station) =>
+            Number.isFinite(station.lat) && Number.isFinite(station.lng),
+        );
+        setStations(mapped);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        setStations([]);
+        console.warn("Stationsdaten konnten nicht geladen werden:", err);
+      }
+    }
+
+    loadStations();
+    return () => {
+      cancelled = true;
+    };
+  }, [cityName]);
+
+  function createMarkerId() {
+    return `marker-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function saveMarker() {
+    if (!point) return;
+    setSavedMarkers((prev) => [
+      ...prev,
+      {
+        id: createMarkerId(),
+        lat: point.lat,
+        lng: point.lng,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+  }
+
+  function saveBestMarker() {
+    if (!point) return;
+    setBestMarker({
+      id: createMarkerId(),
+      lat: point.lat,
+      lng: point.lng,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
   //Dummy Daten für Häufigkeit der Nutzung einer Station
   const demoUsage = {
     avgUtilization: 78,
@@ -230,9 +417,116 @@ export default function PlanningView() {
 
           <ClickHandler onClick={handleClick} />
 
+          {stations.map((station) => (
+            <Marker
+              key={`station-${station.id}`}
+              position={[station.lat, station.lng]}
+              icon={stationIcon}
+            >
+              <Popup>
+                <div style={{ fontSize: 12 }}>
+                  <strong>{station.name}</strong>
+                  <div>Station (Bestand)</div>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+          {(context?.poi_elements ?? []).map((poi) => (
+            <Marker
+              key={`poi-${poi.category}-${poi.id}`}
+              position={[poi.lat, poi.lng]}
+              icon={poiIcons[poi.category]}
+            >
+              <Popup>
+                <div style={{ fontSize: 12 }}>
+                  <strong>{poi.name ?? "Ohne Namen"}</strong>
+                  <div>
+                    {poi.category === "shop"
+                      ? "Shop"
+                      : poi.category === "school"
+                        ? "Schule"
+                        : "Uni / Hochschule"}
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+          {savedMarkers.map((marker) => (
+            <Marker
+              key={marker.id}
+              position={[marker.lat, marker.lng]}
+              icon={savedIcon}
+            >
+              <Popup>
+                <div style={{ fontSize: 12 }}>
+                  <strong>Gespeicherter Marker</strong>
+                  <div>{new Date(marker.createdAt).toLocaleString()}</div>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+          {bestMarker && (
+            <Marker
+              key={bestMarker.id}
+              position={[bestMarker.lat, bestMarker.lng]}
+              icon={bestIcon}
+            >
+              <Popup>
+                <div style={{ fontSize: 12 }}>
+                  <strong>Bestes Ergebnis</strong>
+                  <div>{new Date(bestMarker.createdAt).toLocaleString()}</div>
+                </div>
+              </Popup>
+            </Marker>
+          )}
+
           {point && (
             <>
-              <Marker position={[point.lat, point.lng]} />
+              <Marker position={[point.lat, point.lng]} icon={selectedIcon}>
+                <Popup>
+                  <div style={{ fontSize: 12 }}>
+                    <strong>Ausgewählter Punkt</strong>
+                    <div>
+                      {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                      <button
+                        type="button"
+                        onClick={saveMarker}
+                        style={{
+                          padding: "4px 8px",
+                          borderRadius: 6,
+                          border: "1px solid #f59e0b",
+                          background: "#fff7ed",
+                          color: "#9a3412",
+                          fontSize: 11,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Marker speichern
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveBestMarker}
+                        style={{
+                          padding: "4px 8px",
+                          borderRadius: 6,
+                          border: "1px solid #16a34a",
+                          background: "#ecfdf3",
+                          color: "#166534",
+                          fontSize: 11,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Best speichern
+                      </button>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
               <Circle
                 center={[point.lat, point.lng]}
                 radius={radius}
