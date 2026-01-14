@@ -6,10 +6,10 @@ import {
   TileLayer,
   Marker,
   Circle,
-  CircleMarker,
   Popup,
   useMapEvents,
 } from "react-leaflet";
+import L from "leaflet";
 
 import "leaflet/dist/leaflet.css";
 import HeatGridLayer from "../components/HeatGridLayer";
@@ -36,6 +36,30 @@ const theme = {
     cardBackground: "#ffffff",
   },
 };
+
+const stationIcon = L.divIcon({
+  className: "planning-station-icon",
+  html: '<div style="background:#2563eb;width:18px;height:18px;border-radius:50%;border:2px solid #1e3a8a;box-shadow:0 0 0 2px rgba(255,255,255,0.9);"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+  popupAnchor: [0, -8],
+});
+
+const proposalIcon = L.divIcon({
+  className: "planning-proposal-icon",
+  html: '<div style="background:#f97316;width:18px;height:18px;border-radius:50%;border:2px solid #c2410c;box-shadow:0 0 0 2px rgba(255,255,255,0.9);"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+  popupAnchor: [0, -8],
+});
+
+const bestProposalIcon = L.divIcon({
+  className: "planning-best-icon",
+  html: '<div style="background:#22c55e;width:18px;height:18px;border-radius:50%;border:2px solid #15803d;box-shadow:0 0 0 2px rgba(255,255,255,0.9);"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+  popupAnchor: [0, -8],
+});
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -598,16 +622,10 @@ export default function PlanningView() {
 
           {showStations &&
             stations.map((station) => (
-              <CircleMarker
+              <Marker
                 key={station.id}
-                center={[station.lat, station.lng]}
-                radius={6}
-                pathOptions={{
-                  color: "#0f172a",
-                  weight: 1,
-                  fillColor: "#22c55e",
-                  fillOpacity: 0.85,
-                }}
+                position={[station.lat, station.lng]}
+                icon={stationIcon}
               >
                 <Popup>
                   <div style={{ fontSize: 12 }}>
@@ -615,13 +633,14 @@ export default function PlanningView() {
                     <div>Station Nr: {station.stationNumber}</div>
                   </div>
                 </Popup>
-              </CircleMarker>
+              </Marker>
             ))}
 
           {proposals.map((p) => (
             <Marker
               key={p.id}
               position={[p.lat, p.lng]}
+              icon={p.id === bestId ? bestProposalIcon : proposalIcon}
               eventHandlers={{
                 click: () => setSelectedId(p.id),
               }}
