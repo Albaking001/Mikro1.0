@@ -1,6 +1,6 @@
 // src/pages/PlanningView.tsx
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -651,6 +651,15 @@ export default function PlanningView() {
     showRailStations ||
     showBusStops;
 
+  const handleBoundsChange = useCallback((bounds: L.LatLngBounds) => {
+    setMapBounds({
+      sw_lat: bounds.getSouthWest().lat,
+      sw_lng: bounds.getSouthWest().lng,
+      ne_lat: bounds.getNorthEast().lat,
+      ne_lng: bounds.getNorthEast().lng,
+    });
+  }, []);
+
   useEffect(() => {
     if (!mapBounds || !poiEnabled) {
       return;
@@ -710,16 +719,7 @@ export default function PlanningView() {
           />
 
           <ClickHandler onClick={handleClick} />
-          <BoundsHandler
-            onBoundsChange={(bounds) =>
-              setMapBounds({
-                sw_lat: bounds.getSouthWest().lat,
-                sw_lng: bounds.getSouthWest().lng,
-                ne_lat: bounds.getNorthEast().lat,
-                ne_lng: bounds.getNorthEast().lng,
-              })
-            }
-          />
+          <BoundsHandler onBoundsChange={handleBoundsChange} />
 
           {showStations &&
             stations.map((station) => (
