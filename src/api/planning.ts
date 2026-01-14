@@ -156,6 +156,20 @@ export type PrecomputedScoresResponse = {
   points: PrecomputedScorePoint[];
 };
 
+export type PoiPoint = {
+  lat: number;
+  lng: number;
+};
+
+export type PlanningPoiLayersResponse = {
+  bbox: { sw_lat: number; sw_lng: number; ne_lat: number; ne_lng: number };
+  bus_stops: PoiPoint[];
+  rail_stations: PoiPoint[];
+  schools: PoiPoint[];
+  universities: PoiPoint[];
+  shops: PoiPoint[];
+};
+
 export async function getPrecomputedPlanningScores(args: {
   city_name?: string;
   step_m?: number;
@@ -176,6 +190,21 @@ export async function getPrecomputedPlanningScores(args: {
   } as Record<string, string | number>);
 
   return fetchJson<PrecomputedScoresResponse>(url);
+}
+
+export async function getPlanningPoiLayers(args: {
+  sw_lat: number;
+  sw_lng: number;
+  ne_lat: number;
+  ne_lng: number;
+}): Promise<PlanningPoiLayersResponse> {
+  const url = buildUrl("/api/v1/planning/poi-layers", {
+    sw_lat: args.sw_lat,
+    sw_lng: args.sw_lng,
+    ne_lat: args.ne_lat,
+    ne_lng: args.ne_lng,
+  });
+  return fetchJson<PlanningPoiLayersResponse>(url);
 }
 
 export async function setBestProposal(proposalId: number): Promise<ProposalOut> {

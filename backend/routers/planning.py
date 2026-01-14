@@ -17,6 +17,11 @@ from services.overpass import (
     count_schools_universities,
     count_shops,
     count_pois,
+    fetch_bus_stops_bbox,
+    fetch_rail_stations_bbox,
+    fetch_schools_bbox,
+    fetch_shops_bbox,
+    fetch_universities_bbox,
 )
 
 router = APIRouter(prefix="/api/v1/planning", tags=["planning"])
@@ -172,3 +177,39 @@ def get_precomputed_scores(
         data.setdefault("meta", {})["points_returned"] = len(pts)
 
     return data
+
+
+@router.get("/poi-layers")
+def planning_poi_layers(
+    sw_lat: float = Query(...),
+    sw_lng: float = Query(...),
+    ne_lat: float = Query(...),
+    ne_lng: float = Query(...),
+):
+    """
+    Punktdaten (OSM/Overpass) für Kartenlayer im aktuellen Kartenausschnitt:
+    - Bus Stops
+    - Rail Stations
+    - Schools
+    - Universities
+    - Shops
+    """
+    try:
+        bus_stops = fetch_bus_stops_bbox(sw_lat, sw_lng, ne_lat, ne_lng)
+        rail_stations = fetch_rail_stations_bbox(sw_lat, sw_lng, ne_lat, ne_lng)
+        schools = fetch_schools_bbox(sw_lat, sw_lng, ne_lat, ne_lng)
+        universities = fetch_universities_bbox(sw_lat, sw_lng, ne_lat, ne_lng)
+        shops = fetch_shops_bbox(sw_lat, sw_lng, ne_lat, ne_lng)
+    except OverpassError as e:
+        raise HTTPException(status_code=502, detail=f"Overpass error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+    return {
+        "bbox": {"sw_lat": sw_lat, "sw_lng": sw_lng, "ne_lat": ne_lat, "ne_lng": ne_lng},
+        "bus_stops": bus_stops,
+        "rail_stations": rail_stations,
+        "schools": schools,
+        "universities": universities,
+        "shops": shops,
+    }
