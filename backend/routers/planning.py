@@ -2,6 +2,8 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 import math
+import json
+from pathlib import Path
 
 from database import SessionLocal
 from models import Station, City
@@ -15,7 +17,6 @@ from services.overpass import (
     count_schools_universities,
     count_shops,
     count_pois,
-    fetch_poi_elements,
 )
 
 router = APIRouter(prefix="/api/v1/planning", tags=["planning"])
@@ -64,7 +65,6 @@ def planning_context(
         edu = count_schools_universities(lat, lng, radius)
         shops = count_shops(lat, lng, radius)
         pois = count_pois(lat, lng, radius)
-        poi_elements = fetch_poi_elements(lat, lng, radius)
 
     except OverpassError as e:
        
@@ -91,7 +91,6 @@ def planning_context(
 
         "pois_total": pois["total"],
         "pois": pois["breakdown"],
-        "poi_elements": poi_elements,
     }
 
 
@@ -142,3 +141,34 @@ def nearby_stations(
         "nearest_station_distance_m": None if nearest_distance is None else round(nearest_distance, 1),
         "debug_stations_total": len(stations),
     }
+
+@router.get("/precomputed-scores")
+def get_precomputed_scores(
+    city_name: str = Query("Mainz"),
+    step_m: int = Query(250, ge=50, le=2000),
+    radius_m: int = Query(500, ge=50, le=5000),
+    sw_lat: float | None = None,
+    sw_lng: float | None = None,
+    ne_lat: float | None = None,
+    ne_lng: float | None = None,
+):
+    slug = "".join(ch.lower() if ch.isalnum() else "_" for ch in city_name).strip("_")
+    base = Path(__file__).resolve().parents[1]  # backend/
+    path = base / "precomputed" / f"planning_{slug}_step{step_m}_r{radius_m}.json"
+
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Precomputed file not found: {path.name}. Run precompute script first.",
+        )
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    pts = data.get("points", [])
+
+    # optional bbox filter (falls du später nur sichtbare Punkte schicken willst)
+    if None not in (sw_lat, sw_lng, ne_lat, ne_lng):
+        pts = [p for p in pts if sw_lat <= p["lat"] <= ne_lat and sw_lng <= p["lng"] <= ne_lng]
+        data["points"] = pts
+        data.setdefault("meta", {})["points_returned"] = len(pts)
+
+    return data

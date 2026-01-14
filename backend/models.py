@@ -12,6 +12,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from database import Base
 
@@ -115,3 +116,34 @@ class StationLiveStatus(Base):
     bike_types = Column(JSONB)
 
     station = relationship("Station", back_populates="live_status")
+
+    #----------------------------------PlanningProposal---------------------
+  
+
+
+class PlanningProposal(Base):
+    __tablename__ = "planning_proposals"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    city_name = Column(String, nullable=False)
+    lat = Column(Float, nullable=False)
+    lng = Column(Float, nullable=False)
+    radius = Column(Integer, nullable=False)
+
+    score = Column(Integer, nullable=False)
+    score_label = Column(String, nullable=False)
+
+    stations_in_radius = Column(Integer, nullable=True)
+    nearest_station = Column(String, nullable=True)
+    nearest_distance_m = Column(Integer, nullable=True)
+
+    bus_stops = Column(Integer, nullable=True)
+    railway_stations = Column(Integer, nullable=True)
+    schools = Column(Integer, nullable=True)
+    universities = Column(Integer, nullable=True)
+    shops = Column(Integer, nullable=True)
+
+    is_best = Column(Boolean, default=False)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

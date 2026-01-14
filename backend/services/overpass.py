@@ -48,6 +48,67 @@ def _around_clause(lat: float, lng: float, radius_m: int) -> str:
    
     return f"(around:{radius_m},{lat},{lng})"
 
+from typing import Any
+
+def _bbox_clause(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float) -> str:
+    # Overpass bbox: (south,west,north,east)
+    return f"({sw_lat},{sw_lng},{ne_lat},{ne_lng})"
+
+def _fetch_nodes(query: str) -> list[dict[str, float]]:
+    data = _post_overpass(query)
+    pts: list[dict[str, float]] = []
+    for el in data.get("elements", []):
+        if el.get("type") == "node" and "lat" in el and "lon" in el:
+            pts.append({"lat": float(el["lat"]), "lng": float(el["lon"])})
+    return pts
+
+def fetch_bus_stops_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float) -> list[dict[str, float]]:
+    bbox = _bbox_clause(sw_lat, sw_lng, ne_lat, ne_lng)
+    query = f"""
+    [out:json][timeout:45];
+    (
+      node["highway"="bus_stop"]{bbox};
+      node["public_transport"~"platform|stop_position"]["bus"="yes"]{bbox};
+      node["amenity"="bus_station"]{bbox};
+    );
+    out;
+    """
+    return _fetch_nodes(query)
+
+def fetch_schools_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float) -> list[dict[str, float]]:
+    bbox = _bbox_clause(sw_lat, sw_lng, ne_lat, ne_lng)
+    query = f"""
+    [out:json][timeout:45];
+    (
+      node["amenity"="school"]{bbox};
+      node["building"="school"]{bbox};
+    );
+    out;
+    """
+    return _fetch_nodes(query)
+
+def fetch_universities_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float) -> list[dict[str, float]]:
+    bbox = _bbox_clause(sw_lat, sw_lng, ne_lat, ne_lng)
+    query = f"""
+    [out:json][timeout:45];
+    (
+      node["amenity"="university"]{bbox};
+      node["amenity"="college"]{bbox};
+    );
+    out;
+    """
+    return _fetch_nodes(query)
+
+def fetch_shops_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float) -> list[dict[str, float]]:
+    bbox = _bbox_clause(sw_lat, sw_lng, ne_lat, ne_lng)
+    query = f"""
+    [out:json][timeout:45];
+    (
+      node["shop"]{bbox};
+    );
+    out;
+    """
+    return _fetch_nodes(query)
 
 
 
@@ -239,50 +300,3 @@ def count_pois(lat: float, lng: float, radius_m: int) -> dict:
         total += c
 
     return {"total": total, "breakdown": breakdown}
-
-
-def fetch_poi_elements(lat: float, lng: float, radius_m: int, limit: int = 200) -> list[dict]:
-    around = _around_clause(lat, lng, radius_m)
-    query = f"""
-    [out:json][timeout:25];
-    (
-      node["shop"]{around};
-      node["amenity"="school"]{around};
-      node["amenity"="university"]{around};
-      node["amenity"="college"]{around};
-    );
-    out {limit};
-    """
-    data = _post_overpass(query)
-    elements = data.get("elements", [])
-
-    results: list[dict] = []
-    for element in elements:
-        tags = element.get("tags", {})
-        category = None
-        if "shop" in tags:
-            category = "shop"
-        elif tags.get("amenity") == "school":
-            category = "school"
-        elif tags.get("amenity") in {"university", "college"}:
-            category = "university"
-
-        if category is None:
-            continue
-
-        lat_value = element.get("lat")
-        lng_value = element.get("lon")
-        if lat_value is None or lng_value is None:
-            continue
-
-        results.append(
-            {
-                "id": element.get("id"),
-                "lat": lat_value,
-                "lng": lng_value,
-                "category": category,
-                "name": tags.get("name"),
-            }
-        )
-
-    return results

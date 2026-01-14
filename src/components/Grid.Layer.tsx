@@ -1,76 +1,90 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
 
-export default function GridLayer() {
+type Props = {
+  cellSize?: number;
+  color?: string;
+  weight?: number;
+  opacity?: number;
+  enabled?: boolean;
+};
+
+export default function GridLayer({
+  cellSize = 100,
+  color = "#000000",
+  weight = 1,
+  opacity = 0.25,
+  enabled = true,
+}: Props) {
   const map = useMap();
+  const groupRef = useRef<L.LayerGroup | null>(null);
 
   useEffect(() => {
-    let lines: L.Polyline[] = [];
+    if (!enabled) {
+      if (groupRef.current) {
+        groupRef.current.remove();
+        groupRef.current = null;
+      }
+      return;
+    }
+
+    if (!groupRef.current) {
+      groupRef.current = L.layerGroup().addTo(map);
+    }
 
     const drawGrid = () => {
-      // alte Linien löschen
-      lines.forEach((line) => map.removeLayer(line));
-      lines = [];
+      const group = groupRef.current!;
+      group.clearLayers();
 
       const bounds = map.getBounds();
-      const south = bounds.getSouth();
-      const north = bounds.getNorth();
-      const west = bounds.getWest();
-      const east = bounds.getEast();
-
       const zoom = map.getZoom();
 
-      let step: number;
-      if (zoom <= 10) {
-        step = 0.05;
-      } else if (zoom <= 12) {
-        step = 0.02;
-      } else if (zoom <= 14) {
-        step = 0.01;
-      } else if (zoom <= 16) {
-        step = 0.005;
-      } else {
-        step = 0.0025;
+      const sw = map.project(bounds.getSouthWest(), zoom);
+      const ne = map.project(bounds.getNorthEast(), zoom);
+
+
+      const lat = map.getCenter().lat;
+      const metersPerPixel =
+        (156543.03392804097 * Math.cos((lat * Math.PI) / 180)) /
+        Math.pow(2, zoom);
+
+
+      const step = cellSize / metersPerPixel;
+
+
+      const xStart = Math.floor(sw.x / step) * step;
+      const yStart = Math.floor(ne.y / step) * step;
+
+
+      for (let x = xStart; x <= ne.x; x += step) {
+        const a = map.unproject(L.point(x, sw.y), zoom);
+        const b = map.unproject(L.point(x, ne.y), zoom);
+        L.polyline([a, b], { color, weight, opacity }).addTo(group);
       }
 
-      const startLat = Math.floor(south / step) * step;
-      const startLng = Math.floor(west / step) * step;
 
-      for (let lat = startLat; lat <= north; lat += step) {
-        const line = L.polyline(
-          [
-            [lat, west],
-            [lat, east],
-          ],
-          { color: "#000000", weight: 1, opacity: 0.25 }
-        ).addTo(map);
-        lines.push(line);
-      }
-
-      for (let lng = startLng; lng <= east; lng += step) {
-        const line = L.polyline(
-          [
-            [south, lng],
-            [north, lng],
-          ],
-          { color: "#000000", weight: 1, opacity: 0.25 }
-        ).addTo(map);
-        lines.push(line);
+      for (let y = yStart; y <= sw.y; y += step) {
+        const a = map.unproject(L.point(sw.x, y), zoom);
+        const b = map.unproject(L.point(ne.x, y), zoom);
+        L.polyline([a, b], { color, weight, opacity }).addTo(group);
       }
     };
 
     drawGrid();
-
     map.on("moveend", drawGrid);
     map.on("zoomend", drawGrid);
 
     return () => {
       map.off("moveend", drawGrid);
       map.off("zoomend", drawGrid);
-      lines.forEach((line) => map.removeLayer(line));
+
+      if (groupRef.current) {
+        groupRef.current.remove();
+        groupRef.current = null;
+      }
     };
-  }, [map]);
+  }, [map, cellSize, color, weight, opacity, enabled]);
 
   return null;
 }

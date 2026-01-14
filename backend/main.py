@@ -9,6 +9,7 @@ from database import engine
 from models import Base
 from routers.providers import router as providers_router
 from routers.planning import router as planning_router
+from routers.planning_proposals import router as planning_proposals_router
 
 
 
@@ -20,3 +21,4 @@ app.include_router(live_status_router)
 app.include_router(heatmap_router)
 app.include_router(providers_router)
 app.include_router(planning_router)
+app.include_router(planning_proposals_router)
