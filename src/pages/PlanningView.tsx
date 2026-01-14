@@ -1,7 +1,16 @@
 // src/pages/PlanningView.tsx
 
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Circle, Popup, useMapEvents } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Circle,
+  Popup,
+  useMapEvents,
+  LayersControl,
+  LayerGroup,
+} from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -410,27 +419,34 @@ export default function PlanningView() {
           zoom={13}
           style={{ height: "100%", width: "100%" }}
         >
-          <TileLayer
-            attribution='&copy; OpenStreetMap contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          <LayersControl position="topright">
+            <LayersControl.BaseLayer checked name="OpenStreetMap">
+              <TileLayer
+                attribution='&copy; OpenStreetMap contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+            </LayersControl.BaseLayer>
+            <LayersControl.Overlay checked name="Fahrradstationen">
+              <LayerGroup>
+                {stations.map((station) => (
+                  <Marker
+                    key={`station-${station.id}`}
+                    position={[station.lat, station.lng]}
+                    icon={stationIcon}
+                  >
+                    <Popup>
+                      <div style={{ fontSize: 12 }}>
+                        <strong>{station.name}</strong>
+                        <div>Station (Bestand)</div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+              </LayerGroup>
+            </LayersControl.Overlay>
+          </LayersControl>
 
           <ClickHandler onClick={handleClick} />
-
-          {stations.map((station) => (
-            <Marker
-              key={`station-${station.id}`}
-              position={[station.lat, station.lng]}
-              icon={stationIcon}
-            >
-              <Popup>
-                <div style={{ fontSize: 12 }}>
-                  <strong>{station.name}</strong>
-                  <div>Station (Bestand)</div>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
 
           {(context?.poi_elements ?? []).map((poi) => (
             <Marker
