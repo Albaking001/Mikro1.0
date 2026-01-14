@@ -17,12 +17,14 @@ import HeatGridLayer from "../components/HeatGridLayer";
 import {
   getPlanningContext,
   getNearbyStations,
+  getPlanningPoiLayers,
   getPrecomputedPlanningScores,
 } from "../api/planning";
 
 import type {
   PlanningContextResponse,
   NearbyStationsResponse,
+  PlanningPoiLayersResponse,
   PrecomputedScoresResponse,
 } from "../api/planning";
 
@@ -61,6 +63,21 @@ const bestProposalIcon = L.divIcon({
   popupAnchor: [0, -8],
 });
 
+const createEmojiIcon = (emoji: string, bg: string, border: string) =>
+  L.divIcon({
+    className: "planning-poi-icon",
+    html: `<div style="background:${bg};width:24px;height:24px;border-radius:50%;border:2px solid ${border};display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 0 0 2px rgba(255,255,255,0.9);">${emoji}</div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    popupAnchor: [0, -10],
+  });
+
+const schoolIcon = createEmojiIcon("🏫", "#fde68a", "#f59e0b");
+const universityIcon = createEmojiIcon("🎓", "#bfdbfe", "#3b82f6");
+const shopIcon = createEmojiIcon("🛍️", "#fecdd3", "#f43f5e");
+const railIcon = createEmojiIcon("🚉", "#e5e7eb", "#6b7280");
+const busIcon = createEmojiIcon("🚌", "#bbf7d0", "#22c55e");
+
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   try {
@@ -80,6 +97,27 @@ function ClickHandler({
       onClick(e.latlng.lat, e.latlng.lng);
     },
   });
+  return null;
+}
+
+function BoundsHandler({
+  onBoundsChange,
+}: {
+  onBoundsChange: (bounds: L.LatLngBounds) => void;
+}) {
+  const map = useMapEvents({
+    moveend() {
+      onBoundsChange(map.getBounds());
+    },
+    zoomend() {
+      onBoundsChange(map.getBounds());
+    },
+  });
+
+  useEffect(() => {
+    onBoundsChange(map.getBounds());
+  }, [map, onBoundsChange]);
+
   return null;
 }
 
@@ -120,6 +158,13 @@ type MainzApiStation = {
   lat: number;
   lng: number;
   station_number: number;
+};
+
+type MapBounds = {
+  sw_lat: number;
+  sw_lng: number;
+  ne_lat: number;
+  ne_lng: number;
 };
 
 function Card({
@@ -321,6 +366,15 @@ export default function PlanningView() {
 
   const [showGrid, setShowGrid] = useState<boolean>(false);
   const [showStations, setShowStations] = useState<boolean>(true);
+  const [showSchools, setShowSchools] = useState(false);
+  const [showUniversities, setShowUniversities] = useState(false);
+  const [showShops, setShowShops] = useState(false);
+  const [showRailStations, setShowRailStations] = useState(false);
+  const [showBusStops, setShowBusStops] = useState(false);
+  const [poiLayers, setPoiLayers] = useState<PlanningPoiLayersResponse | null>(null);
+  const [poiLoading, setPoiLoading] = useState(false);
+  const [poiError, setPoiError] = useState<string | null>(null);
+  const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
 
   const [heatMeta, setHeatMeta] = useState<PrecomputedScoresResponse["meta"] | null>(null);
   const [heatPoints, setHeatPoints] = useState<Array<{ ix: number; iy: number; value: number }>>(
@@ -590,6 +644,43 @@ export default function PlanningView() {
     };
   }, [cityName, showStations]);
 
+  const poiEnabled =
+    showSchools ||
+    showUniversities ||
+    showShops ||
+    showRailStations ||
+    showBusStops;
+
+  useEffect(() => {
+    if (!mapBounds || !poiEnabled) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadPoiLayers(bounds: MapBounds) {
+      setPoiLoading(true);
+      setPoiError(null);
+      try {
+        const data = await getPlanningPoiLayers(bounds);
+        if (cancelled) return;
+        setPoiLayers(data);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        setPoiLayers(null);
+        setPoiError(err instanceof Error ? err.message : "Fehler beim Laden der POI-Daten.");
+      } finally {
+        if (!cancelled) setPoiLoading(false);
+      }
+    }
+
+    void loadPoiLayers(mapBounds);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mapBounds, poiEnabled]);
+
   //Dummy Daten für Häufigkeit der Nutzung einer Station
   const demoUsage = {
     avgUtilization: 78,
@@ -619,6 +710,16 @@ export default function PlanningView() {
           />
 
           <ClickHandler onClick={handleClick} />
+          <BoundsHandler
+            onBoundsChange={(bounds) =>
+              setMapBounds({
+                sw_lat: bounds.getSouthWest().lat,
+                sw_lng: bounds.getSouthWest().lng,
+                ne_lat: bounds.getNorthEast().lat,
+                ne_lng: bounds.getNorthEast().lng,
+              })
+            }
+          />
 
           {showStations &&
             stations.map((station) => (
@@ -633,6 +734,61 @@ export default function PlanningView() {
                     <div>Station Nr: {station.stationNumber}</div>
                   </div>
                 </Popup>
+              </Marker>
+            ))}
+
+          {showSchools &&
+            poiLayers?.schools.map((poi, idx) => (
+              <Marker
+                key={`school-${idx}`}
+                position={[poi.lat, poi.lng]}
+                icon={schoolIcon}
+              >
+                <Popup>Schule</Popup>
+              </Marker>
+            ))}
+
+          {showUniversities &&
+            poiLayers?.universities.map((poi, idx) => (
+              <Marker
+                key={`uni-${idx}`}
+                position={[poi.lat, poi.lng]}
+                icon={universityIcon}
+              >
+                <Popup>Universität</Popup>
+              </Marker>
+            ))}
+
+          {showShops &&
+            poiLayers?.shops.map((poi, idx) => (
+              <Marker
+                key={`shop-${idx}`}
+                position={[poi.lat, poi.lng]}
+                icon={shopIcon}
+              >
+                <Popup>Shop</Popup>
+              </Marker>
+            ))}
+
+          {showRailStations &&
+            poiLayers?.rail_stations.map((poi, idx) => (
+              <Marker
+                key={`rail-${idx}`}
+                position={[poi.lat, poi.lng]}
+                icon={railIcon}
+              >
+                <Popup>Bahnhof</Popup>
+              </Marker>
+            ))}
+
+          {showBusStops &&
+            poiLayers?.bus_stops.map((poi, idx) => (
+              <Marker
+                key={`bus-${idx}`}
+                position={[poi.lat, poi.lng]}
+                icon={busIcon}
+              >
+                <Popup>Bus Stop</Popup>
               </Marker>
             ))}
 
@@ -732,6 +888,61 @@ export default function PlanningView() {
         {showStations && (stationsLoading || stationsError) && (
           <div style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 6 }}>
             {stationsLoading ? "Stationen werden geladen..." : stationsError}
+          </div>
+        )}
+
+        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 12, color: "#111827" }}>
+          POI-Layer
+        </div>
+
+        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+          <input
+            type="checkbox"
+            checked={showSchools}
+            onChange={() => setShowSchools((v) => !v)}
+          />
+          Schulen anzeigen
+        </label>
+
+        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+          <input
+            type="checkbox"
+            checked={showUniversities}
+            onChange={() => setShowUniversities((v) => !v)}
+          />
+          Unis anzeigen
+        </label>
+
+        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+          <input
+            type="checkbox"
+            checked={showShops}
+            onChange={() => setShowShops((v) => !v)}
+          />
+          Shops anzeigen
+        </label>
+
+        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+          <input
+            type="checkbox"
+            checked={showRailStations}
+            onChange={() => setShowRailStations((v) => !v)}
+          />
+          Bahnstationen anzeigen
+        </label>
+
+        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+          <input
+            type="checkbox"
+            checked={showBusStops}
+            onChange={() => setShowBusStops((v) => !v)}
+          />
+          Busstops anzeigen
+        </label>
+
+        {poiEnabled && (poiLoading || poiError) && (
+          <div style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 6 }}>
+            {poiLoading ? "POIs werden geladen..." : poiError}
           </div>
         )}
 
