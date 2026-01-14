@@ -78,6 +78,30 @@ const shopIcon = createEmojiIcon("🛍️", "#fecdd3", "#f43f5e");
 const railIcon = createEmojiIcon("🚉", "#e5e7eb", "#6b7280");
 const busIcon = createEmojiIcon("🚌", "#bbf7d0", "#22c55e");
 
+const EARTH_RADIUS_M = 6371000;
+
+function isWithinRadius(
+  centerLat: number,
+  centerLng: number,
+  pointLat: number,
+  pointLng: number,
+  radiusM: number
+): boolean {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(pointLat - centerLat);
+  const dLng = toRad(pointLng - centerLng);
+
+  const lat1 = toRad(centerLat);
+  const lat2 = toRad(pointLat);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return EARTH_RADIUS_M * c <= radiusM;
+}
+
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   try {
@@ -661,7 +685,7 @@ export default function PlanningView() {
   }, []);
 
   useEffect(() => {
-    if (!mapBounds || !poiEnabled) {
+    if (!mapBounds || !poiEnabled || !selected) {
       return;
     }
 
@@ -688,7 +712,24 @@ export default function PlanningView() {
     return () => {
       cancelled = true;
     };
-  }, [mapBounds, poiEnabled]);
+  }, [mapBounds, poiEnabled, selected]);
+
+  const filteredPoiLayers = useMemo(() => {
+    if (!poiLayers || !selected) return null;
+    const { lat: centerLat, lng: centerLng } = selected;
+    const filterPoints = (points: { lat: number; lng: number }[]) =>
+      points.filter((poi) =>
+        isWithinRadius(centerLat, centerLng, poi.lat, poi.lng, radius)
+      );
+
+    return {
+      schools: filterPoints(poiLayers.schools),
+      universities: filterPoints(poiLayers.universities),
+      shops: filterPoints(poiLayers.shops),
+      rail_stations: filterPoints(poiLayers.rail_stations),
+      bus_stops: filterPoints(poiLayers.bus_stops),
+    };
+  }, [poiLayers, radius, selected]);
 
   //Dummy Daten für Häufigkeit der Nutzung einer Station
   const demoUsage = {
@@ -738,7 +779,7 @@ export default function PlanningView() {
             ))}
 
           {showSchools &&
-            poiLayers?.schools.map((poi, idx) => (
+            filteredPoiLayers?.schools.map((poi, idx) => (
               <Marker
                 key={`school-${idx}`}
                 position={[poi.lat, poi.lng]}
@@ -749,7 +790,7 @@ export default function PlanningView() {
             ))}
 
           {showUniversities &&
-            poiLayers?.universities.map((poi, idx) => (
+            filteredPoiLayers?.universities.map((poi, idx) => (
               <Marker
                 key={`uni-${idx}`}
                 position={[poi.lat, poi.lng]}
@@ -760,7 +801,7 @@ export default function PlanningView() {
             ))}
 
           {showShops &&
-            poiLayers?.shops.map((poi, idx) => (
+            filteredPoiLayers?.shops.map((poi, idx) => (
               <Marker
                 key={`shop-${idx}`}
                 position={[poi.lat, poi.lng]}
@@ -771,7 +812,7 @@ export default function PlanningView() {
             ))}
 
           {showRailStations &&
-            poiLayers?.rail_stations.map((poi, idx) => (
+            filteredPoiLayers?.rail_stations.map((poi, idx) => (
               <Marker
                 key={`rail-${idx}`}
                 position={[poi.lat, poi.lng]}
@@ -782,7 +823,7 @@ export default function PlanningView() {
             ))}
 
           {showBusStops &&
-            poiLayers?.bus_stops.map((poi, idx) => (
+            filteredPoiLayers?.bus_stops.map((poi, idx) => (
               <Marker
                 key={`bus-${idx}`}
                 position={[poi.lat, poi.lng]}
