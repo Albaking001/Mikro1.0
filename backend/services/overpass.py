@@ -110,6 +110,18 @@ def fetch_shops_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float)
     """
     return _fetch_nodes(query)
 
+def fetch_rail_stations_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float) -> list[dict[str, float]]:
+    bbox = _bbox_clause(sw_lat, sw_lng, ne_lat, ne_lng)
+    query = f"""
+    [out:json][timeout:45];
+    (
+      node["railway"="station"]{bbox};
+      node["railway"="halt"]{bbox};
+    );
+    out;
+    """
+    return _fetch_nodes(query)
+
 
 
 def count_bus_stops(lat: float, lng: float, radius_m: int) -> int:
