@@ -6,8 +6,10 @@ import {
   TileLayer,
   Marker,
   Circle,
+  Popup,
   useMapEvents,
 } from "react-leaflet";
+import L from "leaflet";
 
 import "leaflet/dist/leaflet.css";
 import HeatGridLayer from "../components/HeatGridLayer";
@@ -34,6 +36,30 @@ const theme = {
     cardBackground: "#ffffff",
   },
 };
+
+const stationIcon = L.divIcon({
+  className: "planning-station-icon",
+  html: '<div style="background:#2563eb;width:18px;height:18px;border-radius:50%;border:2px solid #1e3a8a;box-shadow:0 0 0 2px rgba(255,255,255,0.9);"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+  popupAnchor: [0, -8],
+});
+
+const proposalIcon = L.divIcon({
+  className: "planning-proposal-icon",
+  html: '<div style="background:#f97316;width:18px;height:18px;border-radius:50%;border:2px solid #c2410c;box-shadow:0 0 0 2px rgba(255,255,255,0.9);"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+  popupAnchor: [0, -8],
+});
+
+const bestProposalIcon = L.divIcon({
+  className: "planning-best-icon",
+  html: '<div style="background:#22c55e;width:18px;height:18px;border-radius:50%;border:2px solid #15803d;box-shadow:0 0 0 2px rgba(255,255,255,0.9);"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+  popupAnchor: [0, -8],
+});
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -78,6 +104,22 @@ type Proposal = {
 
   loading: boolean;
   error: string | null;
+};
+
+type BikeStation = {
+  id: number;
+  name: string;
+  lat: number;
+  lng: number;
+  stationNumber: number;
+};
+
+type MainzApiStation = {
+  id: number;
+  name: string;
+  lat: number;
+  lng: number;
+  station_number: number;
 };
 
 function Card({
@@ -278,6 +320,7 @@ export default function PlanningView() {
   }, [bestId, proposals]);
 
   const [showGrid, setShowGrid] = useState<boolean>(false);
+  const [showStations, setShowStations] = useState<boolean>(true);
 
   const [heatMeta, setHeatMeta] = useState<PrecomputedScoresResponse["meta"] | null>(null);
   const [heatPoints, setHeatPoints] = useState<Array<{ ix: number; iy: number; value: number }>>(
@@ -285,6 +328,10 @@ export default function PlanningView() {
   );
 
   const [heatError, setHeatError] = useState<string | null>(null);
+
+  const [stations, setStations] = useState<BikeStation[]>([]);
+  const [stationsLoading, setStationsLoading] = useState(false);
+  const [stationsError, setStationsError] = useState<string | null>(null);
 
   async function handleClick(lat: number, lng: number) {
     const letter = String.fromCharCode(65 + proposals.length); // A,B,C...
@@ -487,6 +534,62 @@ export default function PlanningView() {
 
   }, [cityName]);
 
+  useEffect(() => {
+    if (!showStations) {
+      setStations([]);
+      setStationsError(null);
+      return;
+    }
+
+    if (cityName.trim().toLowerCase() !== "mainz") {
+      setStations([]);
+      setStationsError("Fahrradstationen sind aktuell nur für Mainz verfügbar.");
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadStations() {
+      try {
+        setStationsLoading(true);
+        setStationsError(null);
+
+        const res = await fetch("/api/v1/stations/mainz");
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`Fehler /api/v1/stations/mainz: ${res.status} ${text}`);
+        }
+
+        const data = (await res.json()) as MainzApiStation[];
+        if (cancelled) return;
+
+        const mapped = data
+          .map((s) => ({
+            id: s.id,
+            name: s.name,
+            lat: s.lat,
+            lng: s.lng,
+            stationNumber: s.station_number,
+          }))
+          .filter((s) => Number.isFinite(s.lat) && Number.isFinite(s.lng));
+
+        setStations(mapped);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        setStations([]);
+        setStationsError(err instanceof Error ? err.message : "Fehler beim Laden der Stationen.");
+      } finally {
+        if (!cancelled) setStationsLoading(false);
+      }
+    }
+
+    loadStations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cityName, showStations]);
+
   //Dummy Daten für Häufigkeit der Nutzung einer Station
   const demoUsage = {
     avgUtilization: 78,
@@ -517,10 +620,27 @@ export default function PlanningView() {
 
           <ClickHandler onClick={handleClick} />
 
+          {showStations &&
+            stations.map((station) => (
+              <Marker
+                key={station.id}
+                position={[station.lat, station.lng]}
+                icon={stationIcon}
+              >
+                <Popup>
+                  <div style={{ fontSize: 12 }}>
+                    <div style={{ fontWeight: 700 }}>{station.name}</div>
+                    <div>Station Nr: {station.stationNumber}</div>
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
+
           {proposals.map((p) => (
             <Marker
               key={p.id}
               position={[p.lat, p.lng]}
+              icon={p.id === bestId ? bestProposalIcon : proposalIcon}
               eventHandlers={{
                 click: () => setSelectedId(p.id),
               }}
@@ -599,6 +719,21 @@ export default function PlanningView() {
           />
           Grid anzeigen
         </label>
+
+        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+          <input
+            type="checkbox"
+            checked={showStations}
+            onChange={() => setShowStations((v) => !v)}
+          />
+          Fahrradstationen anzeigen
+        </label>
+
+        {showStations && (stationsLoading || stationsError) && (
+          <div style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 6 }}>
+            {stationsLoading ? "Stationen werden geladen..." : stationsError}
+          </div>
+        )}
 
         <div style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 10 }}>
           Tipp: Klick auf die Karte ⇒ simulierte Station + Context/Network Daten.
