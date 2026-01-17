@@ -982,8 +982,16 @@ export default function PlanningView() {
         </label>
 
         {poiEnabled && (poiLoading || poiError) && (
-          <div style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 6 }}>
-            {poiLoading ? "POIs werden geladen..." : poiError}
+          <div style={{ marginTop: 6 }}>
+            <div style={{ fontSize: 12, color: theme.colors.textMuted }}>
+              {poiLoading ? "POIs werden geladen..." : poiError}
+            </div>
+            {poiLoading && (
+              <progress
+                aria-label="POI-Layer laden"
+                style={{ width: "100%", height: 8, marginTop: 6 }}
+              />
+            )}
           </div>
         )}
 
