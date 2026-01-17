@@ -1,6 +1,8 @@
 # backend/services/overpass.py
 import time
 import requests
+from collections import OrderedDict
+from threading import Lock
 
 # Mehrere Overpass Endpoints 
 OVERPASS_URLS = [
@@ -13,6 +15,11 @@ DEFAULT_TIMEOUT = 15
 DEFAULT_RETRIES = 1
 QUERY_TIMEOUT_BBOX = 15
 QUERY_TIMEOUT_AROUND = 10
+CACHE_TTL_SECONDS = 120
+MAX_CACHE_SIZE = 512
+
+_cache_lock = Lock()
+_overpass_cache: OrderedDict[str, tuple[float, dict]] = OrderedDict()
 
 
 class OverpassError(Exception):
@@ -24,6 +31,16 @@ def _post_overpass(query: str, timeout: int = DEFAULT_TIMEOUT):
     Try multiple Overpass servers with retries.
     Returns parsed JSON.
     """
+    now = time.time()
+    with _cache_lock:
+        cached = _overpass_cache.get(query)
+        if cached:
+            ts, data = cached
+            if now - ts < CACHE_TTL_SECONDS:
+                _overpass_cache.move_to_end(query)
+                return data
+            _overpass_cache.pop(query, None)
+
     last_err = None
 
     for base in OVERPASS_URLS:
@@ -31,7 +48,13 @@ def _post_overpass(query: str, timeout: int = DEFAULT_TIMEOUT):
             try:
                 r = requests.post(base, data={"data": query}, timeout=timeout)
                 r.raise_for_status()
-                return r.json()
+                data = r.json()
+                with _cache_lock:
+                    _overpass_cache[query] = (time.time(), data)
+                    _overpass_cache.move_to_end(query)
+                    while len(_overpass_cache) > MAX_CACHE_SIZE:
+                        _overpass_cache.popitem(last=False)
+                return data
             except Exception as e:
                 last_err = e
                 # backoff
