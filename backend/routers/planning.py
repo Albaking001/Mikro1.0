@@ -1,5 +1,6 @@
 # backend/routers/planning.py
 from fastapi import APIRouter, Depends, Query, HTTPException
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from sqlalchemy.orm import Session
 import math
 import json
@@ -25,6 +26,18 @@ from services.overpass import (
 )
 
 router = APIRouter(prefix="/api/v1/planning", tags=["planning"])
+
+OVERPASS_MAX_WORKERS = 6
+
+
+def run_parallel(tasks: dict[str, callable]) -> dict[str, object]:
+    results: dict[str, object] = {}
+    with ThreadPoolExecutor(max_workers=min(len(tasks), OVERPASS_MAX_WORKERS)) as executor:
+        future_map = {executor.submit(fn): key for key, fn in tasks.items()}
+        for future in as_completed(future_map):
+            key = future_map[future]
+            results[key] = future.result()
+    return results
 
 
 def get_db():
@@ -61,15 +74,18 @@ def planning_context(
     - POIs (breakdown + total)
     """
     try:
-        bus_stops = count_bus_stops(lat, lng, radius)
-        tram_stops = count_tram_stops(lat, lng, radius)
-        rail_stations = count_rail_stations(lat, lng, radius)
-        sbahn_stations = count_sbahn_stations(lat, lng, radius)
-        ubahn_stations = count_ubahn_stations(lat, lng, radius)
-
-        edu = count_schools_universities(lat, lng, radius)
-        shops = count_shops(lat, lng, radius)
-        pois = count_pois(lat, lng, radius)
+        results = run_parallel(
+            {
+                "bus_stops": lambda: count_bus_stops(lat, lng, radius),
+                "tram_stops": lambda: count_tram_stops(lat, lng, radius),
+                "rail_stations": lambda: count_rail_stations(lat, lng, radius),
+                "sbahn_stations": lambda: count_sbahn_stations(lat, lng, radius),
+                "ubahn_stations": lambda: count_ubahn_stations(lat, lng, radius),
+                "edu": lambda: count_schools_universities(lat, lng, radius),
+                "shops": lambda: count_shops(lat, lng, radius),
+                "pois": lambda: count_pois(lat, lng, radius),
+            }
+        )
 
     except OverpassError as e:
        
@@ -82,20 +98,20 @@ def planning_context(
         "lng": lng,
         "radius_m": radius,
 
-        "bus_stops": bus_stops,
-        "tram_stops": tram_stops,
+        "bus_stops": results["bus_stops"],
+        "tram_stops": results["tram_stops"],
 
-        "rail_stations": rail_stations,
-        "sbahn_stations": sbahn_stations,
-        "ubahn_stations": ubahn_stations,
+        "rail_stations": results["rail_stations"],
+        "sbahn_stations": results["sbahn_stations"],
+        "ubahn_stations": results["ubahn_stations"],
 
-        "schools": edu["schools"],
-        "universities": edu["universities"],
+        "schools": results["edu"]["schools"],
+        "universities": results["edu"]["universities"],
 
-        "shops": shops,
+        "shops": results["shops"],
 
-        "pois_total": pois["total"],
-        "pois": pois["breakdown"],
+        "pois_total": results["pois"]["total"],
+        "pois": results["pois"]["breakdown"],
     }
 
 
@@ -195,11 +211,15 @@ def planning_poi_layers(
     - Shops
     """
     try:
-        bus_stops = fetch_bus_stops_bbox(sw_lat, sw_lng, ne_lat, ne_lng)
-        rail_stations = fetch_rail_stations_bbox(sw_lat, sw_lng, ne_lat, ne_lng)
-        schools = fetch_schools_bbox(sw_lat, sw_lng, ne_lat, ne_lng)
-        universities = fetch_universities_bbox(sw_lat, sw_lng, ne_lat, ne_lng)
-        shops = fetch_shops_bbox(sw_lat, sw_lng, ne_lat, ne_lng)
+        results = run_parallel(
+            {
+                "bus_stops": lambda: fetch_bus_stops_bbox(sw_lat, sw_lng, ne_lat, ne_lng),
+                "rail_stations": lambda: fetch_rail_stations_bbox(sw_lat, sw_lng, ne_lat, ne_lng),
+                "schools": lambda: fetch_schools_bbox(sw_lat, sw_lng, ne_lat, ne_lng),
+                "universities": lambda: fetch_universities_bbox(sw_lat, sw_lng, ne_lat, ne_lng),
+                "shops": lambda: fetch_shops_bbox(sw_lat, sw_lng, ne_lat, ne_lng),
+            }
+        )
     except OverpassError as e:
         raise HTTPException(status_code=502, detail=f"Overpass error: {str(e)}")
     except Exception as e:
@@ -207,9 +227,9 @@ def planning_poi_layers(
 
     return {
         "bbox": {"sw_lat": sw_lat, "sw_lng": sw_lng, "ne_lat": ne_lat, "ne_lng": ne_lng},
-        "bus_stops": bus_stops,
-        "rail_stations": rail_stations,
-        "schools": schools,
-        "universities": universities,
-        "shops": shops,
+        "bus_stops": results["bus_stops"],
+        "rail_stations": results["rail_stations"],
+        "schools": results["schools"],
+        "universities": results["universities"],
+        "shops": results["shops"],
     }
