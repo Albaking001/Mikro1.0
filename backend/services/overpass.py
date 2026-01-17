@@ -9,8 +9,10 @@ OVERPASS_URLS = [
     "https://overpass.openstreetmap.ru/api/interpreter",
 ]
 
-DEFAULT_TIMEOUT = 45  
-DEFAULT_RETRIES = 2  
+DEFAULT_TIMEOUT = 15
+DEFAULT_RETRIES = 1
+QUERY_TIMEOUT_BBOX = 15
+QUERY_TIMEOUT_AROUND = 10
 
 
 class OverpassError(Exception):
@@ -33,7 +35,7 @@ def _post_overpass(query: str, timeout: int = DEFAULT_TIMEOUT):
             except Exception as e:
                 last_err = e
                 # backoff
-                time.sleep(1.0 + attempt * 1.5)
+                time.sleep(0.5 + attempt * 0.75)
 
     raise OverpassError(f"Overpass failed after retries. Last error: {last_err}")
 
@@ -65,7 +67,7 @@ def _fetch_nodes(query: str) -> list[dict[str, float]]:
 def fetch_bus_stops_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float) -> list[dict[str, float]]:
     bbox = _bbox_clause(sw_lat, sw_lng, ne_lat, ne_lng)
     query = f"""
-    [out:json][timeout:45];
+    [out:json][timeout:{QUERY_TIMEOUT_BBOX}];
     (
       node["highway"="bus_stop"]{bbox};
       node["public_transport"~"platform|stop_position"]["bus"="yes"]{bbox};
@@ -78,7 +80,7 @@ def fetch_bus_stops_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: fl
 def fetch_schools_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float) -> list[dict[str, float]]:
     bbox = _bbox_clause(sw_lat, sw_lng, ne_lat, ne_lng)
     query = f"""
-    [out:json][timeout:45];
+    [out:json][timeout:{QUERY_TIMEOUT_BBOX}];
     (
       node["amenity"="school"]{bbox};
       node["building"="school"]{bbox};
@@ -90,7 +92,7 @@ def fetch_schools_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: floa
 def fetch_universities_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float) -> list[dict[str, float]]:
     bbox = _bbox_clause(sw_lat, sw_lng, ne_lat, ne_lng)
     query = f"""
-    [out:json][timeout:45];
+    [out:json][timeout:{QUERY_TIMEOUT_BBOX}];
     (
       node["amenity"="university"]{bbox};
       node["amenity"="college"]{bbox};
@@ -102,7 +104,7 @@ def fetch_universities_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng:
 def fetch_shops_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float) -> list[dict[str, float]]:
     bbox = _bbox_clause(sw_lat, sw_lng, ne_lat, ne_lng)
     query = f"""
-    [out:json][timeout:45];
+    [out:json][timeout:{QUERY_TIMEOUT_BBOX}];
     (
       node["shop"]{bbox};
     );
@@ -113,7 +115,7 @@ def fetch_shops_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float)
 def fetch_rail_stations_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float) -> list[dict[str, float]]:
     bbox = _bbox_clause(sw_lat, sw_lng, ne_lat, ne_lng)
     query = f"""
-    [out:json][timeout:45];
+    [out:json][timeout:{QUERY_TIMEOUT_BBOX}];
     (
       node["railway"="station"]{bbox};
       node["railway"="halt"]{bbox};
@@ -127,7 +129,7 @@ def fetch_rail_stations_bbox(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng
 def count_bus_stops(lat: float, lng: float, radius_m: int) -> int:
     around = _around_clause(lat, lng, radius_m)
     query = f"""
-    [out:json][timeout:25];
+    [out:json][timeout:{QUERY_TIMEOUT_AROUND}];
     (
       node["highway"="bus_stop"]{around};
       node["public_transport"~"platform|stop_position"]["bus"="yes"]{around};
@@ -141,7 +143,7 @@ def count_bus_stops(lat: float, lng: float, radius_m: int) -> int:
 def count_tram_stops(lat: float, lng: float, radius_m: int) -> int:
     around = _around_clause(lat, lng, radius_m)
     query = f"""
-    [out:json][timeout:25];
+    [out:json][timeout:{QUERY_TIMEOUT_AROUND}];
     (
       node["railway"="tram_stop"]{around};
       node["public_transport"~"platform|stop_position"]["tram"="yes"]{around};
@@ -157,7 +159,7 @@ def count_rail_stations(lat: float, lng: float, radius_m: int) -> int:
     """
     around = _around_clause(lat, lng, radius_m)
     query = f"""
-    [out:json][timeout:25];
+    [out:json][timeout:{QUERY_TIMEOUT_AROUND}];
     (
       node["railway"="station"]{around};
       node["railway"="halt"]{around};
@@ -174,7 +176,7 @@ def count_sbahn_stations(lat: float, lng: float, radius_m: int) -> int:
     """
     around = _around_clause(lat, lng, radius_m)
     query = f"""
-    [out:json][timeout:25];
+    [out:json][timeout:{QUERY_TIMEOUT_AROUND}];
     (
       node["railway"~"station|halt"]["network"~"S-Bahn",i]{around};
       node["railway"~"station|halt"]["operator"~"S-Bahn",i]{around};
@@ -191,7 +193,7 @@ def count_ubahn_stations(lat: float, lng: float, radius_m: int) -> int:
     """
     around = _around_clause(lat, lng, radius_m)
     query = f"""
-    [out:json][timeout:25];
+    [out:json][timeout:{QUERY_TIMEOUT_AROUND}];
     (
       node["station"="subway"]{around};
       node["railway"="subway_entrance"]{around};
@@ -208,7 +210,7 @@ def count_schools_universities(lat: float, lng: float, radius_m: int) -> dict:
     around = _around_clause(lat, lng, radius_m)
 
     q_schools = f"""
-    [out:json][timeout:25];
+    [out:json][timeout:{QUERY_TIMEOUT_AROUND}];
     (
       node["amenity"="school"]{around};
       node["building"="school"]{around};
@@ -216,7 +218,7 @@ def count_schools_universities(lat: float, lng: float, radius_m: int) -> dict:
     out;
     """
     q_unis = f"""
-    [out:json][timeout:25];
+    [out:json][timeout:{QUERY_TIMEOUT_AROUND}];
     (
       node["amenity"="university"]{around};
       node["amenity"="college"]{around};
@@ -233,7 +235,7 @@ def count_schools_universities(lat: float, lng: float, radius_m: int) -> dict:
 def count_shops(lat: float, lng: float, radius_m: int) -> int:
     around = _around_clause(lat, lng, radius_m)
     query = f"""
-    [out:json][timeout:25];
+    [out:json][timeout:{QUERY_TIMEOUT_AROUND}];
     (
       node["shop"]{around};
     );
@@ -252,7 +254,7 @@ def count_pois(lat: float, lng: float, radius_m: int) -> dict:
     queries = {
         # Gesundheit
         "hospitals": f"""
-        [out:json][timeout:25];
+        [out:json][timeout:{QUERY_TIMEOUT_AROUND}];
         (
           node["amenity"="hospital"]{around};
           node["amenity"="clinic"]{around};
@@ -262,7 +264,7 @@ def count_pois(lat: float, lng: float, radius_m: int) -> dict:
         """,
         # Arbeit 
         "employers": f"""
-        [out:json][timeout:25];
+        [out:json][timeout:{QUERY_TIMEOUT_AROUND}];
         (
           node["office"]{around};
           node["industrial"]{around};
@@ -273,7 +275,7 @@ def count_pois(lat: float, lng: float, radius_m: int) -> dict:
         """,
         # Freizeit
         "parks": f"""
-        [out:json][timeout:25];
+        [out:json][timeout:{QUERY_TIMEOUT_AROUND}];
         (
           node["leisure"="park"]{around};
           node["leisure"="sports_centre"]{around};
@@ -283,7 +285,7 @@ def count_pois(lat: float, lng: float, radius_m: int) -> dict:
         """,
         # Einkaufen/Ankerpunkte
         "malls_supermarkets": f"""
-        [out:json][timeout:25];
+        [out:json][timeout:{QUERY_TIMEOUT_AROUND}];
         (
           node["shop"="supermarket"]{around};
           node["shop"="mall"]{around};
@@ -293,7 +295,7 @@ def count_pois(lat: float, lng: float, radius_m: int) -> dict:
         """,
         # Tourism/Hotspots
         "tourism": f"""
-        [out:json][timeout:25];
+        [out:json][timeout:{QUERY_TIMEOUT_AROUND}];
         (
           node["tourism"]{around};
           node["historic"]{around};
