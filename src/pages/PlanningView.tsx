@@ -155,6 +155,26 @@ type ScoreBreakdown = {
   missingFields: string[];
 };
 
+type ScoreWeights = {
+  schools: number;
+  universities: number;
+  shops: number;
+  busStops: number;
+  rail: number;
+  distance: number;
+  coverage: number;
+};
+
+const DEFAULT_SCORE_WEIGHTS: ScoreWeights = {
+  schools: 2,
+  universities: 3,
+  shops: 0.5,
+  busStops: 0.5,
+  rail: 1.5,
+  distance: 1,
+  coverage: 3,
+};
+
 type Proposal = {
   id: string;
   name: string;
@@ -242,7 +262,8 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 function calculateScore(
   ctx: PlanningContextResponse | null,
-  nb: NearbyStationsResponse | null
+  nb: NearbyStationsResponse | null,
+  weights: ScoreWeights
 ): ScoreBreakdown | null {
   if (!ctx || !nb) return null;
 
@@ -265,23 +286,24 @@ function calculateScore(
     missingFields.push("context.railway_stations");
 
   const weightedDemand =
-    schools * 2 +
-    universities * 3 +
-    shops * 0.5 +
-    busStops * 0.5 +
-    rail * 1.5;
+    schools * weights.schools +
+    universities * weights.universities +
+    shops * weights.shops +
+    busStops * weights.busStops +
+    rail * weights.rail;
 
   const distanceMeters = nb.nearest_station_distance_m ?? 0;
   if (nb.nearest_station_distance_m == null)
     missingFields.push("nearby.nearest_station_distance_m");
 
-  const distanceBonus = Math.min(20, Math.round(distanceMeters / 100));
+  const distanceBonus =
+    Math.min(20, Math.round(distanceMeters / 100)) * weights.distance;
 
   const stationsInRadius = nb.stations_in_radius ?? 0;
   if (nb.stations_in_radius == null)
     missingFields.push("nearby.stations_in_radius");
 
-  const coveragePenalty = Math.min(30, stationsInRadius * 3);
+  const coveragePenalty = Math.min(30, stationsInRadius * weights.coverage);
 
   const rawTotal = weightedDemand + distanceBonus - coveragePenalty;
 
@@ -363,6 +385,9 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 export default function PlanningView() {
   const [radius, setRadius] = useState<number>(500);
   const [cityName, setCityName] = useState<string>("Mainz");
+  const [scoreWeights, setScoreWeights] = useState<ScoreWeights>(
+    DEFAULT_SCORE_WEIGHTS
+  );
 
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -380,7 +405,8 @@ export default function PlanningView() {
 
   const scoreSelected = calculateScore(
     selected?.context ?? null,
-    selected?.nearby ?? null
+    selected?.nearby ?? null,
+    scoreWeights
   );
 
   const bestProposal = useMemo(() => {
@@ -410,6 +436,13 @@ export default function PlanningView() {
   const [stations, setStations] = useState<BikeStation[]>([]);
   const [stationsLoading, setStationsLoading] = useState(false);
   const [stationsError, setStationsError] = useState<string | null>(null);
+
+  const handleWeightChange =
+    (key: keyof ScoreWeights) =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const nextValue = Number(event.target.value);
+      setScoreWeights((prev) => ({ ...prev, [key]: nextValue }));
+    };
 
   async function handleClick(lat: number, lng: number) {
     const letter = String.fromCharCode(65 + proposals.length); // A,B,C...
@@ -491,7 +524,9 @@ export default function PlanningView() {
   function autoPickBest(): string | null {
     let best: { id: string; val: number } | null = null;
     for (const p of compareProposals) {
-      const s = calculateScore(p.context, p.nearby)?.normalizedTotal ?? -1;
+      const s =
+        calculateScore(p.context, p.nearby, scoreWeights)?.normalizedTotal ??
+        -1;
       if (!best || s > best.val) best = { id: p.id, val: s };
     }
     if (best) {
@@ -529,7 +564,7 @@ export default function PlanningView() {
       return;
     }
 
-    const s = calculateScore(p.context, p.nearby);
+    const s = calculateScore(p.context, p.nearby, scoreWeights);
     if (!s) {
       setSaveError("Score konnte nicht berechnet werden.");
       return;
@@ -1213,7 +1248,9 @@ export default function PlanningView() {
 
                   <tbody>
                     {compareProposals.map((p) => {
-                      const s = calculateScore(p.context, p.nearby)?.normalizedTotal ?? null;
+                      const s =
+                        calculateScore(p.context, p.nearby, scoreWeights)
+                          ?.normalizedTotal ?? null;
 
                       return (
                         <tr
@@ -1281,6 +1318,96 @@ export default function PlanningView() {
         </Card>
 
         <Card title="Score (Potenzial)">
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: theme.colors.textMuted, marginBottom: 8 }}>
+              Gewichtung der Faktoren (0 = ignorieren, höher = stärkerer Einfluss).
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gap: 10,
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              }}
+            >
+              <div>
+                <FieldLabel>Schulen ({scoreWeights.schools.toFixed(1)})</FieldLabel>
+                <input
+                  type="range"
+                  min={0}
+                  max={5}
+                  step={0.5}
+                  value={scoreWeights.schools}
+                  onChange={handleWeightChange("schools")}
+                />
+              </div>
+              <div>
+                <FieldLabel>Universitäten ({scoreWeights.universities.toFixed(1)})</FieldLabel>
+                <input
+                  type="range"
+                  min={0}
+                  max={5}
+                  step={0.5}
+                  value={scoreWeights.universities}
+                  onChange={handleWeightChange("universities")}
+                />
+              </div>
+              <div>
+                <FieldLabel>Shops ({scoreWeights.shops.toFixed(1)})</FieldLabel>
+                <input
+                  type="range"
+                  min={0}
+                  max={5}
+                  step={0.5}
+                  value={scoreWeights.shops}
+                  onChange={handleWeightChange("shops")}
+                />
+              </div>
+              <div>
+                <FieldLabel>Bus ({scoreWeights.busStops.toFixed(1)})</FieldLabel>
+                <input
+                  type="range"
+                  min={0}
+                  max={5}
+                  step={0.5}
+                  value={scoreWeights.busStops}
+                  onChange={handleWeightChange("busStops")}
+                />
+              </div>
+              <div>
+                <FieldLabel>Rail ({scoreWeights.rail.toFixed(1)})</FieldLabel>
+                <input
+                  type="range"
+                  min={0}
+                  max={5}
+                  step={0.5}
+                  value={scoreWeights.rail}
+                  onChange={handleWeightChange("rail")}
+                />
+              </div>
+              <div>
+                <FieldLabel>Distanzbonus ({scoreWeights.distance.toFixed(1)})</FieldLabel>
+                <input
+                  type="range"
+                  min={0}
+                  max={5}
+                  step={0.5}
+                  value={scoreWeights.distance}
+                  onChange={handleWeightChange("distance")}
+                />
+              </div>
+              <div>
+                <FieldLabel>Abdeckungs-Penalty ({scoreWeights.coverage.toFixed(1)})</FieldLabel>
+                <input
+                  type="range"
+                  min={0}
+                  max={5}
+                  step={0.5}
+                  value={scoreWeights.coverage}
+                  onChange={handleWeightChange("coverage")}
+                />
+              </div>
+            </div>
+          </div>
           {scoreSelected ? (
             <>
               <div
