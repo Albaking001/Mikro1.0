@@ -214,34 +214,52 @@ type MapBounds = {
 function Card({
   title,
   children,
+  defaultOpen = true,
 }: {
   title?: string;
   children: React.ReactNode;
+  defaultOpen?: boolean;
 }) {
+  if (!title) {
+    return (
+      <div
+        style={{
+          background: theme.colors.cardBackground,
+          borderRadius: 14,
+          padding: 16,
+          marginBottom: 16,
+          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
+
   return (
-    <div
+    <details
+      open={defaultOpen}
+      className="sidebar-accordion"
       style={{
         background: theme.colors.cardBackground,
         borderRadius: 14,
-        padding: 16,
         marginBottom: 16,
         boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
       }}
     >
-      {title && (
-        <div
-          style={{
-            fontSize: 14,
-            fontWeight: 700,
-            color: theme.colors.textPrimary,
-            marginBottom: 12,
-          }}
-        >
-          {title}
-        </div>
-      )}
-      {children}
-    </div>
+      <summary
+        className="sidebar-accordion__summary"
+        style={{
+          color: theme.colors.textPrimary,
+        }}
+      >
+        <span>{title}</span>
+        <span className="sidebar-accordion__chevron" aria-hidden>
+          ▶
+        </span>
+      </summary>
+      <div className="sidebar-accordion__content">{children}</div>
+    </details>
   );
 }
 
@@ -913,7 +931,7 @@ export default function PlanningView() {
           </div>
         </div>
 
-        <Card title="Eingaben">
+        <Card title="Eingaben" defaultOpen>
           <FieldLabel>City</FieldLabel>
           <input
             value={cityName}
