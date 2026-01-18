@@ -143,14 +143,44 @@ def main():
     db: Session = SessionLocal()
     try:
         city = db.query(City).filter(City.name.ilike(city_name)).first()
+        if not city:
+            raise SystemExit(f"City '{city_name}' not found in DB.")
+
         if (
-            not city
-            or city.bounds_sw_lat is None
+            city.bounds_sw_lat is None
             or city.bounds_sw_lng is None
             or city.bounds_ne_lat is None
             or city.bounds_ne_lng is None
         ):
-            raise SystemExit(f"City '{city_name}' not found or missing bounds_* in DB.")
+            stations = (
+                db.query(Station)
+                .join(City, City.id == Station.city_id)
+                .filter(City.id == city.id)
+                .filter(Station.lat.isnot(None))
+                .filter(Station.lng.isnot(None))
+                .all()
+            )
+            if not stations:
+                raise SystemExit(
+                    f"City '{city_name}' missing bounds_* and no station coords available."
+                )
+
+            lats = [float(s.lat) for s in stations]
+            lngs = [float(s.lng) for s in stations]
+            min_lat, max_lat = min(lats), max(lats)
+            min_lng, max_lng = min(lngs), max(lngs)
+            if min_lat == max_lat:
+                min_lat -= 0.01
+                max_lat += 0.01
+            if min_lng == max_lng:
+                min_lng -= 0.01
+                max_lng += 0.01
+
+            city.bounds_sw_lat = min_lat
+            city.bounds_sw_lng = min_lng
+            city.bounds_ne_lat = max_lat
+            city.bounds_ne_lng = max_lng
+            db.commit()
 
         sw_lat, sw_lng = float(city.bounds_sw_lat), float(city.bounds_sw_lng)
         ne_lat, ne_lng = float(city.bounds_ne_lat), float(city.bounds_ne_lng)

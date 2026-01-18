@@ -81,6 +81,10 @@ for country in data["countries"]:
                   lat  = EXCLUDED.lat,
                   lng  = EXCLUDED.lng,
                   zoom = EXCLUDED.zoom,
+                  bounds_sw_lat = EXCLUDED.bounds_sw_lat,
+                  bounds_sw_lng = EXCLUDED.bounds_sw_lng,
+                  bounds_ne_lat = EXCLUDED.bounds_ne_lat,
+                  bounds_ne_lng = EXCLUDED.bounds_ne_lng,
                   booked_bikes    = EXCLUDED.booked_bikes,
                   available_bikes = EXCLUDED.available_bikes
             RETURNING id;
