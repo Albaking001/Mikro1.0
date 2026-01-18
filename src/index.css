@@ -102,3 +102,72 @@ button:focus-visible {
   height: 600px;
   background: var(--color-bg);
 }
+
+.app-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: linear-gradient(120deg, var(--color-bg) 0%, var(--color-surface) 100%);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-header__inner {
+  max-width: 85%;
+  margin: 0 auto;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.app-brand {
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--color-text);
+}
+
+.app-nav {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.app-nav__link {
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.app-nav__link:hover {
+  color: var(--color-text);
+  background: rgba(79, 70, 229, 0.1);
+}
+
+.app-nav__link--active {
+  color: #ffffff;
+  background: var(--color-primary);
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.35);
+}
+
+.app-content {
+  flex: 1;
+  padding: 16px;
+}
