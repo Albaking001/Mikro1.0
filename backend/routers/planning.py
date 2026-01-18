@@ -186,6 +186,68 @@ def get_precomputed_scores(
     data = json.loads(path.read_text(encoding="utf-8"))
     pts = data.get("points", [])
 
+    def normalize_precomputed(payload: dict) -> dict:
+        points = payload.get("points", [])
+        if not points:
+            return payload
+
+        meta = payload.setdefault("meta", {})
+        needs_ixiy = any("ix" not in p or "iy" not in p for p in points)
+        needs_meta = any(
+            key not in meta
+            for key in ("origin_center", "step_lat", "step_lng", "nx", "ny")
+        )
+
+        if not (needs_ixiy or needs_meta):
+            return payload
+
+        lats = sorted({round(p["lat"], 6) for p in points if "lat" in p})
+        lngs = sorted({round(p["lng"], 6) for p in points if "lng" in p})
+        if not lats or not lngs:
+            return payload
+
+        step_lat = meta.get("step_lat") or (
+            lats[1] - lats[0] if len(lats) > 1 else 0
+        )
+        step_lng = meta.get("step_lng") or (
+            lngs[1] - lngs[0] if len(lngs) > 1 else 0
+        )
+
+        origin_center = meta.get("origin_center") or {}
+        origin_center_lat = origin_center.get("lat") or lats[0]
+        origin_center_lng = origin_center.get("lng") or lngs[0]
+
+        meta.update(
+            {
+                "origin_center": {
+                    "lat": origin_center_lat,
+                    "lng": origin_center_lng,
+                },
+                "step_lat": step_lat,
+                "step_lng": step_lng,
+                "nx": meta.get("nx") or len(lngs),
+                "ny": meta.get("ny") or len(lats),
+            }
+        )
+
+        if needs_ixiy:
+            lat_index = {lat: idx for idx, lat in enumerate(lats)}
+            lng_index = {lng: idx for idx, lng in enumerate(lngs)}
+            for p in points:
+                if "ix" in p and "iy" in p:
+                    continue
+                if "lat" not in p or "lng" not in p:
+                    continue
+                lat_key = round(p["lat"], 6)
+                lng_key = round(p["lng"], 6)
+                p.setdefault("ix", lng_index.get(lng_key))
+                p.setdefault("iy", lat_index.get(lat_key))
+
+        return payload
+
+    data = normalize_precomputed(data)
+    pts = data.get("points", [])
+
     # optional bbox filter (falls du später nur sichtbare Punkte schicken willst)
     if None not in (sw_lat, sw_lng, ne_lat, ne_lng):
         pts = [p for p in pts if sw_lat <= p["lat"] <= ne_lat and sw_lng <= p["lng"] <= ne_lng]
