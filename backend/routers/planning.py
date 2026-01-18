@@ -264,6 +264,7 @@ def get_fixed_heatmap():
     base = Path(__file__).resolve().parents[1]  # backend/
     path = base / "precomputed" / "planning_heatmap.json"
     if not path.exists():
-        raise HTTPException(status_code=404, detail="Heatmap file not found. Click 'Precompute' first.")
+        raise HTTPException(
+            status_code=404, detail="Heatmap file not found. Click 'Precompute' first."
+        )
     return json.loads(path.read_text(encoding="utf-8"))
-
