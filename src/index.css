@@ -171,3 +171,42 @@ button:focus-visible {
   flex: 1;
   padding: 16px;
 }
+
+.sidebar-accordion {
+  border: 1px solid transparent;
+  overflow: hidden;
+}
+
+.sidebar-accordion__summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  font-size: 14px;
+  font-weight: 700;
+  gap: 8px;
+}
+
+.sidebar-accordion__summary::-webkit-details-marker {
+  display: none;
+}
+
+.sidebar-accordion__summary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+}
+
+.sidebar-accordion__content {
+  padding: 0 16px 16px;
+}
+
+.sidebar-accordion__chevron {
+  transition: transform 0.2s ease;
+  font-size: 12px;
+}
+
+.sidebar-accordion[open] .sidebar-accordion__chevron {
+  transform: rotate(90deg);
+}
