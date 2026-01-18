@@ -517,7 +517,11 @@ export default function PlanningView() {
     setHeatLoading(true);
     setHeatError(null);
     try {
-      await precomputeHeatmap({ city_name: "Mainz", step_m: 250, radius_m: 500 });
+      await precomputeHeatmap({
+        city_name: cityName,
+        step_m: 250,
+        radius_m: radius,
+      });
       const res = await getFixedHeatmap();
       setHeatMeta(res.meta);
       setHeatPoints(res.points.map((p) => ({ ix: p.ix, iy: p.iy, value: p.score })));
@@ -648,29 +652,32 @@ export default function PlanningView() {
     }
   }
 
-useEffect(() => {
-  let cancelled = false;
-  setHeatError(null);
+  useEffect(() => {
+    let cancelled = false;
+    setHeatError(null);
 
-  getFixedHeatmap()
-    .then((res) => {
-      if (cancelled) return;
-      setHeatMeta(res.meta);
-      setHeatPoints(
-        res.points.map((p) => ({ ix: p.ix, iy: p.iy, value: p.score }))
-      );
-    })
-    .catch((e: unknown) => {
-      if (cancelled) return;
-      setHeatMeta(null);
-      setHeatPoints([]);
-      setHeatError(getErrorMessage(e));
-    });
+    async function loadHeatmap() {
+      try {
+        const res = await getFixedHeatmap();
+        if (cancelled) return;
+        setHeatMeta(res.meta);
+        setHeatPoints(
+          res.points.map((p) => ({ ix: p.ix, iy: p.iy, value: p.score }))
+        );
+      } catch (e: unknown) {
+        if (cancelled) return;
+        setHeatMeta(null);
+        setHeatPoints([]);
+        setHeatError(getErrorMessage(e));
+      }
+    }
 
-  return () => {
-    cancelled = true;
-  };
-}, []);
+    void loadHeatmap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!showStations) {

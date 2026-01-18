@@ -99,17 +99,46 @@ def score_formula(
 
 def compute_heatmap_payload(db: Session, city_name: str, step_m: int, radius_m: int) -> dict:
     city = db.query(City).filter(City.name.ilike(city_name)).first()
+    if not city:
+        raise ValueError(f"City '{city_name}' not found in DB.")
+
+    stations = None
+    bounds_source = "city"
+
     if (
-        not city
-        or city.bounds_sw_lat is None
+        city.bounds_sw_lat is None
         or city.bounds_sw_lng is None
         or city.bounds_ne_lat is None
         or city.bounds_ne_lng is None
     ):
-        raise ValueError(f"City '{city_name}' not found or missing bounds_* in DB.")
+        stations = (
+            db.query(Station)
+            .join(City, City.id == Station.city_id)
+            .filter(City.name.ilike(city_name))
+            .filter(Station.lat.isnot(None))
+            .filter(Station.lng.isnot(None))
+            .all()
+        )
+        if not stations:
+            raise ValueError(
+                f"City '{city_name}' missing bounds_* and has no stations with coordinates."
+            )
 
-    sw_lat, sw_lng = float(city.bounds_sw_lat), float(city.bounds_sw_lng)
-    ne_lat, ne_lng = float(city.bounds_ne_lat), float(city.bounds_ne_lng)
+        lats = [float(s.lat) for s in stations]
+        lngs = [float(s.lng) for s in stations]
+        min_lat, max_lat = min(lats), max(lats)
+        min_lng, max_lng = min(lngs), max(lngs)
+
+        lat0_for_pad = (min_lat + max_lat) / 2.0
+        pad_lat = meters_to_deg_lat(step_m)
+        pad_lng = meters_to_deg_lng(step_m, lat0_for_pad)
+
+        sw_lat, sw_lng = min_lat - pad_lat, min_lng - pad_lng
+        ne_lat, ne_lng = max_lat + pad_lat, max_lng + pad_lng
+        bounds_source = "stations"
+    else:
+        sw_lat, sw_lng = float(city.bounds_sw_lat), float(city.bounds_sw_lng)
+        ne_lat, ne_lng = float(city.bounds_ne_lat), float(city.bounds_ne_lng)
 
     lat0 = (sw_lat + ne_lat) / 2.0
     lng0 = (sw_lng + ne_lng) / 2.0
@@ -147,14 +176,15 @@ def compute_heatmap_payload(db: Session, city_name: str, step_m: int, radius_m: 
     uni_bins = build_bins(uni_xy, bin_size)
     shop_bins = build_bins(shop_xy, bin_size)
 
-    stations = (
-        db.query(Station)
-        .join(City, City.id == Station.city_id)
-        .filter(City.name.ilike(city_name))
-        .filter(Station.lat.isnot(None))
-        .filter(Station.lng.isnot(None))
-        .all()
-    )
+    if stations is None:
+        stations = (
+            db.query(Station)
+            .join(City, City.id == Station.city_id)
+            .filter(City.name.ilike(city_name))
+            .filter(Station.lat.isnot(None))
+            .filter(Station.lng.isnot(None))
+            .all()
+        )
     station_xy = [latlng_to_xy(float(s.lat), float(s.lng), lat0, lng0) for s in stations]
     station_bins = build_bins(station_xy, bin_size)
 
@@ -193,6 +223,7 @@ def compute_heatmap_payload(db: Session, city_name: str, step_m: int, radius_m: 
     return {
         "meta": {
             "city_name": city_name,
+            "bounds_source": bounds_source,
             "bbox": {"sw_lat": sw_lat, "sw_lng": sw_lng, "ne_lat": ne_lat, "ne_lng": ne_lng},
             "step_m": step_m,
             "radius_m": radius_m,

@@ -91,8 +91,22 @@ def planning_context(
         )
 
     except OverpassError as e:
-       
-        raise HTTPException(status_code=502, detail=f"Overpass error: {str(e)}")
+        return {
+            "lat": lat,
+            "lng": lng,
+            "radius_m": radius,
+            "bus_stops": 0,
+            "tram_stops": 0,
+            "rail_stations": 0,
+            "sbahn_stations": 0,
+            "ubahn_stations": 0,
+            "schools": 0,
+            "universities": 0,
+            "shops": 0,
+            "pois_total": 0,
+            "pois": {},
+            "overpass_error": str(e),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
@@ -223,7 +237,15 @@ def planning_poi_layers(
             }
         )
     except OverpassError as e:
-        raise HTTPException(status_code=502, detail=f"Overpass error: {str(e)}")
+        return {
+            "bbox": {"sw_lat": sw_lat, "sw_lng": sw_lng, "ne_lat": ne_lat, "ne_lng": ne_lng},
+            "bus_stops": [],
+            "rail_stations": [],
+            "schools": [],
+            "universities": [],
+            "shops": [],
+            "overpass_error": str(e),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
@@ -264,6 +286,7 @@ def get_fixed_heatmap():
     base = Path(__file__).resolve().parents[1]  # backend/
     path = base / "precomputed" / "planning_heatmap.json"
     if not path.exists():
-        raise HTTPException(status_code=404, detail="Heatmap file not found. Click 'Precompute' first.")
+        raise HTTPException(
+            status_code=404, detail="Heatmap file not found. Click 'Precompute' first."
+        )
     return json.loads(path.read_text(encoding="utf-8"))
-
