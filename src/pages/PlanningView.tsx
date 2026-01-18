@@ -666,32 +666,9 @@ export default function PlanningView() {
         );
       } catch (e: unknown) {
         if (cancelled) return;
-        const message = getErrorMessage(e);
-        if (message.includes("HTTP 404")) {
-          try {
-            await precomputeHeatmap({
-              city_name: cityName,
-              step_m: 250,
-              radius_m: radius,
-            });
-            const res = await getFixedHeatmap();
-            if (cancelled) return;
-            setHeatMeta(res.meta);
-            setHeatPoints(
-              res.points.map((p) => ({ ix: p.ix, iy: p.iy, value: p.score }))
-            );
-            return;
-          } catch (innerError: unknown) {
-            if (cancelled) return;
-            setHeatMeta(null);
-            setHeatPoints([]);
-            setHeatError(getErrorMessage(innerError));
-            return;
-          }
-        }
         setHeatMeta(null);
         setHeatPoints([]);
-        setHeatError(message);
+        setHeatError(getErrorMessage(e));
       }
     }
 
@@ -700,7 +677,7 @@ export default function PlanningView() {
     return () => {
       cancelled = true;
     };
-  }, [cityName, radius]);
+  }, []);
 
   useEffect(() => {
     if (!showStations) {

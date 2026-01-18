@@ -269,16 +269,7 @@ def get_fixed_heatmap(
     base = Path(__file__).resolve().parents[1]  # backend/
     path = base / "precomputed" / "planning_heatmap.json"
     if not path.exists():
-        try:
-            payload = compute_heatmap_payload(
-                db, city_name=city_name, step_m=step_m, radius_m=radius_m
-            )
-            write_fixed_heatmap_file(payload, filename="planning_heatmap.json")
-            return payload
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except OverpassError as e:
-            raise HTTPException(status_code=502, detail=f"Overpass error: {str(e)}")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(
+            status_code=404, detail="Heatmap file not found. Click 'Precompute' first."
+        )
     return json.loads(path.read_text(encoding="utf-8"))
