@@ -1,5 +1,3 @@
-// src/pages/PlanningView.tsx
-
 import { useMemo, useState, useEffect, useCallback } from "react";
 import {
   MapContainer,
@@ -18,7 +16,8 @@ import {
   getPlanningContext,
   getNearbyStations,
   getPlanningPoiLayers,
-  getPrecomputedPlanningScores,
+  precomputeHeatmap,
+  getFixedHeatmap,
 } from "../api/planning";
 
 import type {
@@ -401,6 +400,9 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 export default function PlanningView() {
+
+  const [heatLoading, setHeatLoading] = useState<boolean>(false);
+
   const [radius, setRadius] = useState<number>(500);
   const [cityName, setCityName] = useState<string>("Mainz");
   const [scoreWeights, setScoreWeights] = useState<ScoreWeights>(
@@ -510,6 +512,24 @@ export default function PlanningView() {
     }
   }
 
+  
+  async function handlePrecomputeHeatmap() {
+    setHeatLoading(true);
+    setHeatError(null);
+    try {
+      await precomputeHeatmap({ city_name: "Mainz", step_m: 250, radius_m: 500 });
+      const res = await getFixedHeatmap();
+      setHeatMeta(res.meta);
+      setHeatPoints(res.points.map((p) => ({ ix: p.ix, iy: p.iy, value: p.score })));
+    } catch (e: unknown) {
+      setHeatMeta(null);
+      setHeatPoints([]);
+      setHeatError(getErrorMessage(e));
+    } finally {
+      setHeatLoading(false);
+    }
+  }
+
   function toggleCompare(id: string) {
     setCompareIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -564,7 +584,6 @@ export default function PlanningView() {
       return;
     }
 
-    // إذا ماكانش bestId، خليه يتختار أوتوماتيكياً
     let idToSave = bestId;
     if (!idToSave) idToSave = autoPickBest();
 
@@ -588,7 +607,6 @@ export default function PlanningView() {
       return;
     }
 
-    // ✅ هنا حل 422: nearest_distance_m خاصها int
     const nearestDistanceInt =
       p.nearby.nearest_station_distance_m == null
         ? null
@@ -630,40 +648,29 @@ export default function PlanningView() {
     }
   }
 
-  useEffect(() => {
-    if (cityName.trim().toLowerCase() !== "mainz") {
+useEffect(() => {
+  let cancelled = false;
+  setHeatError(null);
+
+  getFixedHeatmap()
+    .then((res) => {
+      if (cancelled) return;
+      setHeatMeta(res.meta);
+      setHeatPoints(
+        res.points.map((p) => ({ ix: p.ix, iy: p.iy, value: p.score }))
+      );
+    })
+    .catch((e: unknown) => {
+      if (cancelled) return;
       setHeatMeta(null);
       setHeatPoints([]);
-      setHeatError("Heatmap ist aktuell nur für Mainz vorberechnet.");
+      setHeatError(getErrorMessage(e));
+    });
 
-      return;
-    }
-
-    let cancelled = false;
-    setHeatError(null);
-
-    getPrecomputedPlanningScores({ city_name: "Mainz", step_m: 250, radius_m: 500 })
-      .then((res) => {
-        if (cancelled) return;
-        setHeatMeta(res.meta);
-        setHeatPoints(res.points.map((p) => ({ ix: p.ix, iy: p.iy, value: p.score })));
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        setHeatMeta(null);
-        setHeatPoints([]);
-        setHeatError(getErrorMessage(e));
-
-      })
-      .finally(() => {
-        if (cancelled) return;
-      });
-
-    return () => {
-      cancelled = true;
-    };
-
-  }, [cityName]);
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   useEffect(() => {
     if (!showStations) {
@@ -1047,6 +1054,34 @@ export default function PlanningView() {
             )}
           </div>
         )}
+
+              <div style={{ marginTop: 12 }}>
+        <button
+          onClick={handlePrecomputeHeatmap}
+          disabled={heatLoading}
+          style={{
+            padding: "8px 12px",
+            borderRadius: 10,
+            border: "1px solid #ddd",
+            cursor: heatLoading ? "not-allowed" : "pointer",
+            fontWeight: 700,
+          }}
+        >
+          {heatLoading ? "Berechne Heatmap..." : "Heatmap berechnen"}
+        </button>
+
+        {heatMeta?.generated_at && (
+          <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>
+            Letzte Berechnung: {heatMeta.generated_at}
+          </div>
+        )}
+
+        {heatError && (
+          <div style={{ marginTop: 6, fontSize: 12, color: "#8a0000" }}>
+            Heatmap-Fehler: {heatError}
+          </div>
+        )}
+      </div>
 
         <div style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 10 }}>
           Tipp: Klick auf die Karte ⇒ simulierte Station + Context/Network Daten.

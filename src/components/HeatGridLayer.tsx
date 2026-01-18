@@ -1,16 +1,6 @@
-// src/components/HeatGridLayer.tsx
-
 import { useEffect, useRef } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
-
-type CellInfo = {
-  bounds: L.LatLngBounds;
-  center: L.LatLng;
-  ix: number;
-  iy: number;
-  zoom: number;
-};
 
 type HeatPoint = { ix: number; iy: number; value: number };
 
@@ -18,38 +8,23 @@ type HeatMeta = {
   origin_center: { lat: number; lng: number };
   step_lat: number;
   step_lng: number;
-  nx: number;
-  ny: number;
 };
 
 type Props = {
   enabled?: boolean;
-
-  fillOpacity?: number;
-  showGridLines?: boolean;
-  lineColor?: string;
-  lineWeight?: number;
-  lineOpacity?: number;
-
   points?: HeatPoint[];
   meta?: HeatMeta;
 
-  aggregate?: "avg" | "max";
-  getValue?: (cell: CellInfo) => number;
+  fillOpacity?: number;
+  showGridLines?: boolean;
 };
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function quantize20(v: number) {
-  const c = clamp(v, 0, 100);
-  return Math.round(c / 20) * 20;
-}
-
-function valueToColor20(v: number) {
-  const q = quantize20(v);
-  const t = q / 100;
+function valueToColor(v: number) {
+  const t = clamp(v, 0, 100) / 100;
   const r = Math.round(255 * (1 - t));
   const g = Math.round(255 * t);
   return `rgb(${r}, ${g}, 0)`;
@@ -57,15 +32,10 @@ function valueToColor20(v: number) {
 
 export default function HeatGridLayer({
   enabled = true,
+  points = [],
+  meta,
   fillOpacity = 0.45,
   showGridLines = true,
-  lineColor = "#000000",
-  lineWeight = 1,
-  lineOpacity = 0.15,
-  points,
-  meta,
-  aggregate = "avg",
-  getValue,
 }: Props) {
   const map = useMap();
   const groupRef = useRef<L.LayerGroup | null>(null);
@@ -73,10 +43,8 @@ export default function HeatGridLayer({
 
   useEffect(() => {
     if (!enabled) {
-      if (groupRef.current) {
-        groupRef.current.remove();
-        groupRef.current = null;
-      }
+      groupRef.current?.remove();
+      groupRef.current = null;
       rendererRef.current = null;
       return;
     }
@@ -88,39 +56,23 @@ export default function HeatGridLayer({
       pane.style.pointerEvents = "none";
     }
 
-    if (!rendererRef.current) {
-      rendererRef.current = L.canvas({ pane: paneName });
-    }
-
-    if (!groupRef.current) {
-      groupRef.current = L.layerGroup().addTo(map);
-    }
+    if (!rendererRef.current) rendererRef.current = L.canvas({ pane: paneName });
+    if (!groupRef.current) groupRef.current = L.layerGroup().addTo(map);
 
     const draw = () => {
       const group = groupRef.current!;
       group.clearLayers();
 
-      if (!meta) return;
+      if (!meta?.origin_center || !meta.step_lat || !meta.step_lng) return;
 
       const { origin_center, step_lat, step_lng } = meta;
 
       const bounds = map.getBounds();
-      const zoom = map.getZoom();
       const sw = bounds.getSouthWest();
       const ne = bounds.getNorthEast();
 
-      const bins = new Map<string, { sum: number; count: number; max: number }>();
-
-      if (points && points.length > 0) {
-        for (const p of points) {
-          const key = `${p.ix}:${p.iy}`;
-          const cur = bins.get(key) ?? { sum: 0, count: 0, max: -Infinity };
-          cur.sum += p.value;
-          cur.count += 1;
-          cur.max = Math.max(cur.max, p.value);
-          bins.set(key, cur);
-        }
-      }
+      const mapVals = new Map<string, number>();
+      for (const p of points) mapVals.set(`${p.ix}:${p.iy}`, p.value);
 
       const ixMin = Math.floor((sw.lng - origin_center.lng) / step_lng) - 1;
       const ixMax = Math.floor((ne.lng - origin_center.lng) / step_lng) + 1;
@@ -137,27 +89,17 @@ export default function HeatGridLayer({
             L.latLng(centerLat + step_lat / 2, centerLng + step_lng / 2)
           );
 
-          const center = cellBounds.getCenter();
-          const cell: CellInfo = { bounds: cellBounds, center, ix, iy, zoom };
-
-          const b = bins.get(`${ix}:${iy}`);
-          const hasData = !!b && b.count > 0;
-
-          let v: number;
-          if (getValue) v = getValue(cell);
-          else if (!hasData) v = 0;
-          else v = aggregate === "max" ? b!.max : b!.sum / b!.count;
+          const v = mapVals.get(`${ix}:${iy}`) ?? 0;
 
           L.rectangle(cellBounds, {
             pane: paneName,
             renderer: rendererRef.current!,
             fill: true,
-            fillColor: valueToColor20(v),
-            fillOpacity: hasData ? fillOpacity : 0,
+            fillColor: valueToColor(v),
+            fillOpacity: fillOpacity,
             stroke: showGridLines,
-            color: lineColor,
-            weight: lineWeight,
-            opacity: lineOpacity,
+            weight: 1,
+            opacity: 0.15,
           }).addTo(group);
         }
       }
@@ -172,25 +114,11 @@ export default function HeatGridLayer({
     return () => {
       map.off("moveend", draw);
       map.off("zoomend", draw);
-      if (groupRef.current) {
-        groupRef.current.remove();
-        groupRef.current = null;
-      }
+      groupRef.current?.remove();
+      groupRef.current = null;
       rendererRef.current = null;
     };
-  }, [
-    map,
-    enabled,
-    fillOpacity,
-    showGridLines,
-    lineColor,
-    lineWeight,
-    lineOpacity,
-    points,
-    meta,
-    aggregate,
-    getValue,
-  ]);
+  }, [map, enabled, points, meta, fillOpacity, showGridLines]);
 
   return null;
 }

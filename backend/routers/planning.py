@@ -24,7 +24,9 @@ from services.overpass import (
     fetch_shops_bbox,
     fetch_universities_bbox,
 )
-from services.planning_precompute import PrecomputeError, precompute_planning_scores
+
+from services.heatmap_precompute import compute_heatmap_payload, write_fixed_heatmap_file
+
 
 router = APIRouter(prefix="/api/v1/planning", tags=["planning"])
 
@@ -187,31 +189,12 @@ def get_precomputed_scores(
     data = json.loads(path.read_text(encoding="utf-8"))
     pts = data.get("points", [])
 
-    # optional bbox filter (falls du später nur sichtbare Punkte schicken willst)
     if None not in (sw_lat, sw_lng, ne_lat, ne_lng):
         pts = [p for p in pts if sw_lat <= p["lat"] <= ne_lat and sw_lng <= p["lng"] <= ne_lng]
         data["points"] = pts
         data.setdefault("meta", {})["points_returned"] = len(pts)
 
     return data
-
-
-@router.post("/heatmap/precompute")
-def precompute_heatmap(
-    city_name: str = Query("Mainz"),
-    step_m: int = Query(250, ge=50, le=2000),
-    radius_m: int = Query(500, ge=50, le=5000),
-    db: Session = Depends(get_db),
-):
-    try:
-        out_path, payload = precompute_planning_scores(db, city_name, step_m, radius_m)
-    except PrecomputeError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc))
-    return {
-        "status": "ok",
-        "file": out_path.name,
-        "points_total": payload["meta"]["points_total"],
-    }
 
 
 @router.get("/poi-layers")
@@ -252,3 +235,35 @@ def planning_poi_layers(
         "universities": results["universities"],
         "shops": results["shops"],
     }
+
+@router.post("/heatmap/precompute")
+def precompute_heatmap(
+    city_name: str = Query("Mainz"),
+    step_m: int = Query(250, ge=50, le=2000),
+    radius_m: int = Query(500, ge=50, le=5000),
+    db: Session = Depends(get_db),
+):
+    try:
+        payload = compute_heatmap_payload(db, city_name=city_name, step_m=step_m, radius_m=radius_m)
+        out_path = write_fixed_heatmap_file(payload, filename="planning_heatmap.json")
+        return {
+            "ok": True,
+            "file": out_path.name,
+            "meta": payload.get("meta", {}),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except OverpassError as e:
+        raise HTTPException(status_code=502, detail=f"Overpass error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+
+@router.get("/heatmap/precomputed")
+def get_fixed_heatmap():
+    base = Path(__file__).resolve().parents[1]  # backend/
+    path = base / "precomputed" / "planning_heatmap.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Heatmap file not found. Click 'Precompute' first.")
+    return json.loads(path.read_text(encoding="utf-8"))
+

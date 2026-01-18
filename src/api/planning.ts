@@ -210,3 +210,26 @@ export async function getPlanningPoiLayers(args: {
 export async function setBestProposal(proposalId: number): Promise<ProposalOut> {
   return postJson<ProposalOut>(`/api/v1/planning/proposals/${proposalId}/set-best`, {});
 }
+
+export async function precomputeHeatmap(args?: {
+  city_name?: string;
+  step_m?: number;
+  radius_m?: number;
+}): Promise<{ ok: boolean; file: string; meta: PrecomputedScoresResponse["meta"] }> {
+  const url = buildUrl("/api/v1/planning/heatmap/precompute", {
+    city_name: args?.city_name ?? "Mainz",
+    step_m: args?.step_m ?? 250,
+    radius_m: args?.radius_m ?? 500,
+  } as Record<string, string | number>);
+
+  const res = await fetch(url, { method: "POST" });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}: ${txt || res.statusText}`);
+  }
+  return (await res.json()) as any;
+}
+
+export async function getFixedHeatmap(): Promise<PrecomputedScoresResponse> {
+  return fetchJson<PrecomputedScoresResponse>("/api/v1/planning/heatmap/precomputed");
+}
