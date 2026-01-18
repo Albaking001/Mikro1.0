@@ -260,7 +260,12 @@ def precompute_heatmap(
 
 
 @router.get("/heatmap/precomputed")
-def get_fixed_heatmap():
+def get_fixed_heatmap(
+    city_name: str = Query("Mainz"),
+    step_m: int = Query(250, ge=50, le=2000),
+    radius_m: int = Query(500, ge=50, le=5000),
+    db: Session = Depends(get_db),
+):
     base = Path(__file__).resolve().parents[1]  # backend/
     path = base / "precomputed" / "planning_heatmap.json"
     if not path.exists():
