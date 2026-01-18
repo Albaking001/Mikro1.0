@@ -8,11 +8,13 @@ from threading import Lock
 OVERPASS_URLS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.openstreetmap.fr/api/interpreter",
+    "https://overpass.nchc.org.tw/api/interpreter",
     "https://overpass.openstreetmap.ru/api/interpreter",
 ]
 
 DEFAULT_TIMEOUT = 15
-DEFAULT_RETRIES = 1
+DEFAULT_RETRIES = 2
 QUERY_TIMEOUT_BBOX = 15
 QUERY_TIMEOUT_AROUND = 10
 CACHE_TTL_SECONDS = 120
@@ -32,6 +34,7 @@ def _post_overpass(query: str, timeout: int = DEFAULT_TIMEOUT):
     Returns parsed JSON.
     """
     now = time.time()
+    stale_data = None
     with _cache_lock:
         cached = _overpass_cache.get(query)
         if cached:
@@ -39,6 +42,7 @@ def _post_overpass(query: str, timeout: int = DEFAULT_TIMEOUT):
             if now - ts < CACHE_TTL_SECONDS:
                 _overpass_cache.move_to_end(query)
                 return data
+            stale_data = data
             _overpass_cache.pop(query, None)
 
     last_err = None
@@ -59,6 +63,9 @@ def _post_overpass(query: str, timeout: int = DEFAULT_TIMEOUT):
                 last_err = e
                 # backoff
                 time.sleep(0.5 + attempt * 0.75)
+
+    if stale_data is not None:
+        return stale_data
 
     raise OverpassError(f"Overpass failed after retries. Last error: {last_err}")
 
