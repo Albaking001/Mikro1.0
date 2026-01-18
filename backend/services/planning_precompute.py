@@ -141,10 +141,23 @@ def ensure_city_bounds(db: Session, city: City, city_name: str) -> None:
         .all()
     )
     if not stations:
-        raise PrecomputeError(
-            f"City '{city_name}' missing bounds_* and no station coords available.",
-            status_code=400,
-        )
+        if city.lat is None or city.lng is None:
+            raise PrecomputeError(
+                f"City '{city_name}' missing bounds_* and no station or city coords available.",
+                status_code=400,
+            )
+
+        min_lat = float(city.lat) - 0.05
+        max_lat = float(city.lat) + 0.05
+        min_lng = float(city.lng) - 0.05
+        max_lng = float(city.lng) + 0.05
+
+        city.bounds_sw_lat = min_lat
+        city.bounds_sw_lng = min_lng
+        city.bounds_ne_lat = max_lat
+        city.bounds_ne_lng = max_lng
+        db.commit()
+        return
 
     lats = [float(s.lat) for s in stations]
     lngs = [float(s.lng) for s in stations]
