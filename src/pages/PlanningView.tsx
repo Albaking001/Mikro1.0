@@ -931,7 +931,7 @@ export default function PlanningView() {
           </div>
         </div>
 
-        <Card title="Eingaben">
+        <Card title="Eingaben" defaultOpen>
           <FieldLabel>City</FieldLabel>
           <input
             value={cityName}
