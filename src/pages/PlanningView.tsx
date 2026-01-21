@@ -6,11 +6,13 @@ import {
   Circle,
   Popup,
   useMapEvents,
+  LayersControl,
 } from "react-leaflet";
 import L from "leaflet";
 
 import "leaflet/dist/leaflet.css";
 import HeatGridLayer from "../components/HeatGridLayer";
+import WmsOverlay from "../components/WmsOverlay";
 
 import {
   getPlanningContext,
@@ -78,6 +80,33 @@ const railIcon = createEmojiIcon("🚉", "#e5e7eb", "#6b7280");
 const busIcon = createEmojiIcon("🚌", "#bbf7d0", "#22c55e");
 
 const EARTH_RADIUS_M = 6371000;
+
+// --- Geoportal RLP (WMS) defaults (can be tweaked in UI below) ---
+// Tip: Use a GetCapabilities URL to find the exact layer name(s).
+// Example (Bodenrichtwerte): https://www.geoportal.rlp.de/http_auth/63742?REQUEST=GetCapabilities&SERVICE=WMS&withChilds=1
+const DEFAULT_GEO_RLP = {
+  // VBORIS / Bodenrichtwerte (the exact layer name can vary; adjust if needed)
+  boris: {
+    url: "/api/wms?src=boris_gen",
+    layers: "Generalisierte_Bodenrichtwerte",
+    name: "Bodenrichtwerte (BORIS RLP)",
+    attribution: "© GeoBasis-DE / LVermGeoRP",
+  },
+  // ALKIS Flurstücke (often requires a different layer_id; keep as placeholder until confirmed)
+  alkis: {
+    url: "https://www.geoportal.rlp.de/mapbender/php/wms.php",
+    layers: "flurstuecke",
+    name: "Flurstücke (ALKIS RLP)",
+    attribution: "© VermKV Rheinland-Pfalz (ALKIS)",
+  },
+  // Bauleitplanung (layer names vary by provider/municipality)
+  bauleit: {
+    url: "https://www.geoportal.rlp.de/mapbender/php/wms.php",
+    layers: "bebauungsplan",
+    name: "Bebauungspläne (Mainz/RLP)",
+    attribution: "© Stadt Mainz / Geoportal RLP",
+  },
+};
 
 function isWithinRadius(
   centerLat: number,
@@ -433,7 +462,9 @@ export default function PlanningView() {
     if (!bestId) return null;
     return proposals.find((p) => p.id === bestId) ?? null;
   }, [bestId, proposals]);
-
+  const [showBorisWms, setShowBorisWms] = useState(false);
+  const [showAlkisWms, setShowAlkisWms] = useState(false);
+  const [showBauleitWms, setShowBauleitWms] = useState(false);
   const [showGrid, setShowGrid] = useState<boolean>(false);
   const [showStations, setShowStations] = useState<boolean>(true);
   const [showSchools, setShowSchools] = useState(false);
@@ -806,6 +837,9 @@ export default function PlanningView() {
     emptyEventsPerDay: 1,
   };
 
+  // GeoRLP WMS config (editable in UI so you can quickly adjust layer names/URLs)
+  const [geoRlpConfig, setGeoRlpConfig] = useState(DEFAULT_GEO_RLP);
+
   return (
     <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
       {/* MAP */}
@@ -815,10 +849,47 @@ export default function PlanningView() {
           zoom={13}
           style={{ height: "100%", width: "100%" }}
         >
-          <TileLayer
-            attribution="&copy; OpenStreetMap contributors"
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          <LayersControl position="topright">
+            <LayersControl.BaseLayer checked name="OpenStreetMap">
+              <TileLayer
+                attribution="&copy; OpenStreetMap contributors"
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+            </LayersControl.BaseLayer>
+          </LayersControl>
+
+          {showBorisWms && (
+            <WmsOverlay
+              url="/api/wms?src=boris_vboris"
+              layers="RLP_1,RLP_0"
+              version="1.1.1"
+              styles="default,default"
+              transparent={true}
+              format="image/png"
+              opacity={1}
+            />
+          )}
+
+            {showAlkisWms && (
+              <WmsOverlay
+                url={geoRlpConfig.alkis.url}
+                layers={geoRlpConfig.alkis.layers}
+                opacity={0.55}
+                zIndex={660}
+                attribution={geoRlpConfig.alkis.attribution}
+              />
+            )}
+
+            {showBauleitWms && (
+              <WmsOverlay
+                url={geoRlpConfig.bauleit.url}
+                layers={geoRlpConfig.bauleit.layers}
+                opacity={0.55}
+                zIndex={670}
+                attribution={geoRlpConfig.bauleit.attribution}
+              />
+            )}
+
 
           <HeatGridLayer
             enabled={showGrid}
@@ -1095,6 +1166,100 @@ export default function PlanningView() {
         </div>
 
         </Card>
+
+        <Card title="GeoRLP Overlays (WMS)" defaultOpen={false}>
+          <div style={{ fontSize: 12, color: theme.colors.textMuted, marginBottom: 10 }}>
+            Diese Overlays kommen aus dem Geoportal Rheinland-Pfalz. Falls ein Layer nicht
+            rendert, stimmt meist <b>layers</b> oder die <b>url</b> nicht (GetCapabilities hilft beim
+            Nachschlagen).
+          </div>
+
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <input type="checkbox" checked={showBorisWms} onChange={() => setShowBorisWms(v => !v)} />
+            {geoRlpConfig.boris.name} anzeigen
+          </label>
+
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <input type="checkbox" checked={showAlkisWms} onChange={() => setShowAlkisWms(v => !v)} />
+            {geoRlpConfig.alkis.name} anzeigen
+          </label>
+
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+            <input type="checkbox" checked={showBauleitWms} onChange={() => setShowBauleitWms(v => !v)} />
+            {geoRlpConfig.bauleit.name} anzeigen
+          </label>
+
+          {(
+            [
+              { key: "boris", label: "Bodenrichtwerte (BORIS)" },
+              { key: "alkis", label: "Flurstücke (ALKIS)" },
+              { key: "bauleit", label: "Bauleitplanung" },
+            ] as const
+          ).map(({ key, label }) => (
+            <div key={key} style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#111827", marginBottom: 6 }}>
+                {label}
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <input
+                  value={geoRlpConfig[key].url}
+                  onChange={(e) =>
+                    setGeoRlpConfig((prev) => ({
+                      ...prev,
+                      [key]: { ...prev[key], url: e.target.value },
+                    }))
+                  }
+                  style={{
+                    width: "100%",
+                    padding: 8,
+                    borderRadius: 8,
+                    border: "1px solid #ddd",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                    fontSize: 12,
+                  }}
+                  placeholder="WMS base URL (ohne REQUEST=GetMap etc.)"
+                />
+                <input
+                  value={geoRlpConfig[key].layers}
+                  onChange={(e) =>
+                    setGeoRlpConfig((prev) => ({
+                      ...prev,
+                      [key]: { ...prev[key], layers: e.target.value },
+                    }))
+                  }
+                  style={{
+                    width: "100%",
+                    padding: 8,
+                    borderRadius: 8,
+                    border: "1px solid #ddd",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                    fontSize: 12,
+                  }}
+                  placeholder="layers (comma-separated)"
+                />
+              </div>
+            </div>
+          ))}
+
+          <div style={{ fontSize: 12, color: theme.colors.textMuted }}>
+            Tipp: GeoRLP GetCapabilities (Beispiel Bodenrichtwerte):
+            <div
+              style={{
+                marginTop: 6,
+                padding: 8,
+                borderRadius: 8,
+                background: "#f3f4f6",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                fontSize: 11,
+                wordBreak: "break-all",
+              }}
+            >
+              https://www.geoportal.rlp.de/http_auth/63742?REQUEST=GetCapabilities&amp;SERVICE=WMS&amp;withChilds=1
+            </div>
+          </div>
+        </Card>
+
         <Card title="Proposals (Mehrere Standorte)">
           {proposals.length === 0 ? (
             <div style={{ color: theme.colors.textMuted, fontSize: 13 }}>
